@@ -15,7 +15,6 @@ import org.spiffy.actor._
 import org.spiffy.validation._
 import org.spiffy.sample.validation._
 import java.util.LinkedList
-import com.twitter.json._
 
 /**
  * The profile controller handles requests that deal with fetching and
@@ -25,8 +24,6 @@ import com.twitter.json._
 class ProfileController 
   extends Actor 
   with Validation
-  with EmailValidator
-  with StringValidator
   with ValidationHelpers
    {
   /**

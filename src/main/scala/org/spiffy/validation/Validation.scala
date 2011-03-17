@@ -43,12 +43,12 @@ trait Validation {
   }
 
   class SpiffyValidatorStruct(val keyName:String) {
-    var validator:(SpiffyValidatorArgs) => Option[String] = _
+    var validator:SpiffyValidator = _
     var args:Array[Any] = _
     var opt = false
-    var confirm:String = None.toString
+    var confirm:String = _
 
-    def as(v: (SpiffyValidatorArgs) => Option[String], va:Any*) : SpiffyValidatorStruct = {
+    def as(v:SpiffyValidator, va:Any*) : SpiffyValidatorStruct = {
       validator = v
       args = va.toArray
       this
@@ -71,8 +71,15 @@ trait Validation {
   }  
 }
 
-trait StringValidator {
-  def string(args:SpiffyValidatorArgs) : Option[String] = {
+class SpiffyValidatorArgs(val field:String, val req:SpiffyRequestWrapper, val args:Array[Any])
+object SpiffyValidatorArgs { def apply(field:String, req:SpiffyRequestWrapper, args:Array[Any]) = new SpiffyValidatorArgs(field, req, args) }
+
+trait SpiffyValidator {
+  def apply(args:SpiffyValidatorArgs) : Option[String]
+}
+
+object string extends SpiffyValidator {
+  def apply(args:SpiffyValidatorArgs) : Option[String] = {
     try {
       if (args.req.getParameter(args.field).length > 0) None
       else Some(args.field + ":error!")
@@ -84,12 +91,9 @@ trait StringValidator {
   }
 }
 
-class SpiffyValidatorArgs(val field:String, val req:SpiffyRequestWrapper, val args:Array[Any])
-object SpiffyValidatorArgs { def apply(field:String, req:SpiffyRequestWrapper, args:Array[Any]) = new SpiffyValidatorArgs(field, req, args) }
-
-trait EmailValidator {
+object email extends  SpiffyValidator {
   val emailRegex = """([\w\d\-\_]+)(\+\d+)?@([\w\d\-\.]+)""".r
-  def email(args:SpiffyValidatorArgs) : Option[String] = {    
+  def apply(args:SpiffyValidatorArgs) : Option[String] = {    
     try {   
       if (emailRegex.pattern.matcher(args.req.getParameter(args.field)).matches) { 
 	None
