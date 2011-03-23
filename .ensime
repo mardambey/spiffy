@@ -1,0 +1,11 @@
+;; This config was generated using ensime-config-gen. Feel free to customize its contents manually.
+
+(
+
+:project-name "Spiffy"
+
+:project-package "org.spiffy"
+
+:use-maven t
+
+)

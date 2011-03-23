@@ -1,6 +1,8 @@
 package org.spiffy.config
 
+import akka.actor.Actor
 import scala.util.matching.Regex
+import org.spiffy.http._
 
 // controllers in use
 import org.spiffy.sample.controllers._
@@ -23,6 +25,26 @@ object SpiffyConfig {
    * Convenience variable representing the length of the application root
    */
   val APPROOT_LENGTH = APPROOT.length
+
+  /**
+   * The timeout value for the asynchronous request in microseconds
+   */
+  val ASYNC_TIMEOUT = 1000
+
+  /**
+   * Actor to be notified in case of a 404.
+   */
+  val NOT_FOUND_ACTOR = Actor.actorOf[HttpErrorHandler].start
+
+  /**
+   * Actor responsible for rendeing views
+   */
+  val VIEW_HANDLER_ACTOR = FreemarkerViewHandler()
+
+  /**
+   * Actor responsible for routing requests
+   */
+  val ROUTER_ACTOR = Router()
 
  /**
    * Map holding routes. A route is a regular expression that maps to a

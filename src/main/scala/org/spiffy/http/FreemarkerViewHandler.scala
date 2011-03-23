@@ -3,18 +3,20 @@ package org.spiffy.http
 import java.util.HashMap
 import freemarker.template.Template
 import freemarker.template.DefaultObjectWrapper
-import java.io.File
 import freemarker.template.Configuration
+import java.io.File
 import javax.servlet._
 import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
 import scala.collection.JavaConversions._
-import akka.actor.Actor
-import org.spiffy.actor._
+
 import org.spiffy.config._
+
 import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.actor.ActorRegistry
+import akka.actor.Actor
 import akka.actor.SupervisorFactory
 import akka.config.Supervision._
+
 import Console._
 import java.util.{Map => JMap}
 
@@ -26,12 +28,12 @@ import java.util.{Map => JMap}
  *
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
-class ViewHandler extends Actor
+class FreemarkerViewHandler extends Actor
 {
   /**
    * Set the dispatcher
    */
-  self.dispatcher = ViewHandler.dispatcher
+  self.dispatcher = FreemarkerViewHandler.dispatcher
 
   val freemarker = new Configuration()
   // initialize Freemarker
@@ -68,7 +70,7 @@ class ViewHandler extends Actor
   }
 }
 
-object ViewHandler {
+object FreemarkerViewHandler {
 
   // Count of actors that will balance the load
   val ACTORS_COUNT = 100
@@ -89,7 +91,7 @@ object ViewHandler {
    */
   def createListOfSupervizedActors(poolSize: Int): List[Supervise] = {
     (1 to poolSize toList).foldRight(List[Supervise]()) {
-      (i, list) => Supervise(Actor.actorOf( { new ViewHandler() } ).start, Permanent) :: list
+      (i, list) => Supervise(Actor.actorOf( { new FreemarkerViewHandler() } ).start, Permanent) :: list
     }
   }
 
@@ -101,7 +103,7 @@ object ViewHandler {
   // Starts supervisor and all supervised actors
   supervisor.start
 
-  def apply() = ActorRegistry.actorsFor[ViewHandler](classOf[ViewHandler]).head
+  def apply() = ActorRegistry.actorsFor[FreemarkerViewHandler](classOf[FreemarkerViewHandler]).head
 
   // supervisor.stop
   // supervisor.shutdown

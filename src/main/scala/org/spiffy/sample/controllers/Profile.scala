@@ -3,17 +3,19 @@ package org.spiffy.sample.controllers
 import scala.util.matching.Regex
 import javax.servlet._
 import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
-import akka.actor.Actor
 import Console._
-import org.spiffy.http._
+
 import akka.actor.Actor
-import akka.dispatch.{Dispatchers, MessageDispatcher}
+import akka.actor.Actor._
 import akka.actor.ActorRegistry
+import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.actor.SupervisorFactory
 import akka.config.Supervision._
-import org.spiffy.actor._
+
+import org.spiffy.http._
 import org.spiffy.validation._
 import org.spiffy.sample.validation._
+
 import java.util.LinkedList
 
 /**
@@ -63,7 +65,7 @@ class ProfileController
       res.setContentType("text/xml")
       val map = Map("response" -> "false", "errors" -> err.getOrElse(null))
       // TODO: check if the given profile information is valid      
-      ViewHandler() ! List("checkProfile", map, List(req, res, ctx))
+      FreemarkerViewHandler() ! List("checkProfile", map, List(req, res, ctx))
     }
 
     // updates the profile identified by the profile key

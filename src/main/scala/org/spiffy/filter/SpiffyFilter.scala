@@ -2,21 +2,25 @@ package org.spiffy.filter
 
 import javax.servlet._
 import annotation.WebFilter
-import akka.actor.Actor
 import http.{HttpServletResponse, HttpServletRequest}
+import java.util.logging.Logger
+
+import akka.actor.Actor
+
 import org.spiffy.http._
+import org.spiffy.config.SpiffyConfig
 
-case class RequestResponseCtx(req:SpiffyRequestWrapper, res:SpiffyResponseWrapper, ctx:AsyncContext)
-
+/**
+ * Spiffy supports async contexts and "takes over everything in its path".
+ */
 @WebFilter (asyncSupported=true, urlPatterns=Array("/*"), filterName="spiffy")
-class SpiffyFilter extends Object with Filter {
+class SpiffyFilter extends Filter {
 
-  val router = Router()
+  val router = SpiffyConfig.ROUTER_ACTOR
 
   @throws(classOf[ServletException])
-  def init(filterConfig: FilterConfig) : Unit =
-  {
-    println("> Spiffy'ing up! : init()");    
+  def init(filterConfig: FilterConfig) : Unit = {
+    Logger.global.info("> Spiffy'ing up! : init()");
   }
 
   @Override
@@ -24,9 +28,9 @@ class SpiffyFilter extends Object with Filter {
     (req,res) match {
       case (req: HttpServletRequest, res: HttpServletResponse) => {
 
-      // go into asynchronous mode with a 1 second timeout
+	// go into asynchronous mode with a timeout
         val asyncCtx = req.startAsync
-        asyncCtx.setTimeout(1)
+        asyncCtx.setTimeout(SpiffyConfig.ASYNC_TIMEOUT)
 
         // route this request
         router ! wrap(req, res, asyncCtx)
@@ -39,14 +43,5 @@ class SpiffyFilter extends Object with Filter {
 
   }
 
-  def wrap(request: HttpServletRequest, response:HttpServletResponse, ctx:AsyncContext) : RequestResponseCtx = new RequestResponseCtx(new SpiffyRequestWrapper(request), new SpiffyResponseWrapper(response), ctx)
+  def wrap(request: HttpServletRequest, response:HttpServletResponse, ctx:AsyncContext) : ReqResCtx = new ReqResCtx(new SpiffyRequestWrapper(request), new SpiffyResponseWrapper(response), ctx)
 }
-
-
-
-
-
-
-
-
-

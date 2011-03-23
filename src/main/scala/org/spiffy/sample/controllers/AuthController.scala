@@ -3,15 +3,17 @@ package org.spiffy.sample.controllers
 import scala.util.matching.Regex
 import javax.servlet._
 import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
-import akka.actor.Actor
 import Console._
-import org.spiffy.http._
-import akka.actor.Actor
 import akka.dispatch.{Dispatchers, MessageDispatcher}
-import akka.actor.ActorRegistry
+
 import akka.actor.SupervisorFactory
 import akka.config.Supervision._
-import org.spiffy.actor._
+import akka.actor.Actor._
+import akka.actor.Actor
+import akka.actor.ActorRegistry
+
+import org.spiffy.http._
+
 
 /**
  * The authentication controller logs people in and out.
@@ -37,7 +39,7 @@ class AuthController extends Actor
     case List(List("login"), req: SpiffyRequestWrapper, res: SpiffyResponseWrapper, ctx:AsyncContext) => {
       // TODO: this map will eventually be sent to the view for replacements
       val map = Map("foo" -> "foobar!!")    
-      ViewHandler() ! List("login", map, List(req, res, ctx))
+      FreemarkerViewHandler() ! List("login", map, List(req, res, ctx))
     }
 
     // logout operation

@@ -4,18 +4,18 @@ import scala.collection.immutable.HashMap
 import scala.util.matching.Regex
 import javax.servlet._
 import http.{ HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest }
-import akka.actor.{Actor,ActorRef}
 import Console._
-import org.spiffy.sample.controllers._
-import org.spiffy.filter.RequestResponseCtx
 import java.util.concurrent.{CountDownLatch, TimeUnit}
-import akka.actor.Actor
-import akka.dispatch.{Dispatchers, MessageDispatcher}
+
+import akka.actor.Actor._
 import akka.actor.ActorRegistry
+import akka.actor.{Actor,ActorRef}
+import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.actor.SupervisorFactory
 import akka.config.Supervision._
-import akka.dispatch.{Dispatchers, MessageDispatcher}
+
 import org.spiffy.config.SpiffyConfig
+import org.spiffy.sample.controllers._
 
 /**
  * This is the main router class that is responsible for dispatching requests to
@@ -37,9 +37,8 @@ import org.spiffy.config.SpiffyConfig
  *  </li>
  *
  *  <li>
- *  Akka Actor: [TODO: add reference to Akka Actor class, should this be ActorRef?] If
- *  Spiffy encounters an Akka Actor it will contruct an appropriate set of parameters that
- *  will be messaged over asynchronously to the actor. [TODO: finalize what gets sent over]
+ *  Akka Actor: Spiffy encounters an Akka Actor it will contruct an appropriate set of
+ *  parameters that will be messaged over asynchronously to the actor.
  *
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
@@ -55,12 +54,6 @@ class Router extends Actor {
    */
   var controllers = Map[Class[Actor], ActorRef]()
 
-  // iterate over all routes and instantiate controller classes that are Actors
-  //routes foreach {
-  //  case (regex, controller: Class[ActorRef]) => controllers += controller -> controller
-  //  case _ =>
-  //}
-
   /**
    * Receives messages from the Spiffy filter. Attempts tp route the request if a
    * route is available or returns a "not found" (http code 404) otherwise.
@@ -69,14 +62,14 @@ class Router extends Actor {
    */
   def receive = {
     // decide where to route this request
-    case RequestResponseCtx(req, res, ctx) => {
+    case ReqResCtx(req, res, ctx) => {
       // strip away the application root to get the URI to act on
-      val uri = req.getRequestURI().substring(SpiffyConfig.APPROOT_LENGTH)
+      val uri = req.getRequestURI.substring(SpiffyConfig.APPROOT_LENGTH)
 
       // attempt to route the request and return a 404 if not possible
       if (route(uri, req, res, ctx) == false) {
 	// TODO: make this configurable
-        notFound(res, ctx)
+        notFound(req, res, ctx)
       }
     }
 
@@ -126,7 +119,7 @@ class Router extends Actor {
 
               for (i <- 1 to cnt) params = List(matcher.group(i)) ::: params
 	      
-	      // message the controller with the parameters that it needs, request, resoponse, and context
+	      // message the controller with the parameters that it needs, request, response, and context
 	      // TODO: review this, its not safe
 	      ctrl ! (params :: req :: res :: List(ctx))
 
@@ -155,7 +148,8 @@ class Router extends Actor {
    * Helper method that sends back an error message indicating that Spiffy has encountered a
    * page not found error (http response code 404)
    */
-  def notFound(res:SpiffyResponseWrapper, ctx:AsyncContext) : Boolean = {
+  def notFound(req:SpiffyRequestWrapper, res:SpiffyResponseWrapper, ctx:AsyncContext) : Boolean = {
+    SpiffyConfig.NOT_FOUND_ACTOR ! ReqResCtx(req, res, ctx)
     res.getWriter.write("404 - not found")
     ctx.complete
     return false
