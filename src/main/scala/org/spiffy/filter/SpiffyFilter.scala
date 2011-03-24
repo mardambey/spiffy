@@ -16,7 +16,7 @@ import org.spiffy.config.SpiffyConfig
 @WebFilter (asyncSupported=true, urlPatterns=Array("/*"), filterName="spiffy")
 class SpiffyFilter extends Filter {
 
-  val router = SpiffyConfig.ROUTER_ACTOR
+  val router = SpiffyConfig().ROUTER_ACTOR
 
   @throws(classOf[ServletException])
   def init(filterConfig: FilterConfig) : Unit = {
@@ -30,7 +30,7 @@ class SpiffyFilter extends Filter {
 
 	// go into asynchronous mode with a timeout
         val asyncCtx = req.startAsync
-        asyncCtx.setTimeout(SpiffyConfig.ASYNC_TIMEOUT)
+        asyncCtx.setTimeout(SpiffyConfig().ASYNC_TIMEOUT)
 
         // route this request
         router ! wrap(req, res, asyncCtx)

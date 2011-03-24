@@ -4,5 +4,6 @@
 
   <!-- default set of monitored resources -->
   <WatchedResource>WEB-INF/web.xml</WatchedResource>
+  <Environment name="SpiffyConfigObject" value="org.spiffy.config.SpiffyBuiltinConfig" type="java.lang.String"/>
 </Context>
 

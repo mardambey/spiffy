@@ -1,30 +1,111 @@
 package org.spiffy.config
 
-import akka.actor.Actor
+import akka.actor.{Actor,ActorRef}
 import scala.util.matching.Regex
+import scala.reflect.New
+
 import org.spiffy.http._
+import org.spiffy.Helpers.companion
+
+import javax.naming.InitialContext
 
 // controllers in use
 import org.spiffy.sample.controllers._
 
+/**
+ * Used to get a handle on the configuation object
+ */
 object SpiffyConfig {
+
+  /**
+   * If all else fails, use this, pretty useless unless you are working on Spiffy
+   */
+  final val SPIFFY_BUILTIN_CFG = "org.spiffy.config.SpiffyBuiltinConfig"
+  
+  val configClass:String = {
+    try {
+      val ctx = new InitialContext()
+      ctx.lookup("java:comp/env/SpiffyConfigObject").asInstanceOf[String]
+    } catch {
+      case e:Exception => {
+	SPIFFY_BUILTIN_CFG
+      }
+    }
+  }
+  
+  val result = companion[SpiffyConfig](configClass).apply
+  def apply() = result
+}
+
+trait SpiffyConfig {
+
+  /**
+   * Returns ourselves
+   */
+  def apply():SpiffyConfig
 
   /**
    * Full path where the web application is deployed
    * TODO: make this automatic from context
    */
-  var WEBROOT = "/home/hisham/local/apache-tomcat-7.0.5/webapps/spiffy"
+  val WEBROOT:String
+
+ /**
+   * Application root
+   * TODO: move this into some config
+   */
+  val APPROOT:String
+  
+  /**
+   * Convenience variable representing the length of the application root
+   */
+  lazy val APPROOT_LENGTH = APPROOT.length
+
+  /**
+   * The timeout value for the asynchronous request in microseconds
+   */
+  val ASYNC_TIMEOUT:Int
+
+  /**
+   * Actor to be notified in case of a 404.
+   */
+  val NOT_FOUND_ACTOR:ActorRef
+
+  /**
+   * Actor responsible for rendeing views
+   */
+  val VIEW_HANDLER_ACTOR:ActorRef
+
+  /**
+   * Actor responsible for routing requests
+   */
+  val ROUTER_ACTOR:ActorRef
+
+ /**
+   * Map holding routes. A route is a regular expression that maps to a
+   * Scala Any object. See documentation for the router class for details
+   * on what the regex can map to.
+   */
+  val ROUTES:Map[Regex, Any]
+}
+
+/**
+ * Spiffy's built in configuration, needs to be tweaked by user.
+ */
+object SpiffyBuiltinConfig extends SpiffyConfig {
+  def apply = SpiffyBuiltinConfig
+
+  /**
+   * Full path where the web application is deployed
+   * TODO: make this automatic from context
+   */
+  val WEBROOT = "/home/hisham/local/apache-tomcat-7.0.5/webapps/spiffy"
 
  /**
    * Application root
    * TODO: move this into some config
    */
   val APPROOT = "/spiffy"
-  
-  /**
-   * Convenience variable representing the length of the application root
-   */
-  val APPROOT_LENGTH = APPROOT.length
 
   /**
    * The timeout value for the asynchronous request in microseconds
@@ -34,17 +115,17 @@ object SpiffyConfig {
   /**
    * Actor to be notified in case of a 404.
    */
-  val NOT_FOUND_ACTOR = Actor.actorOf[HttpErrorHandler].start
+  lazy val NOT_FOUND_ACTOR = Actor.actorOf[HttpErrorHandler].start
 
   /**
    * Actor responsible for rendeing views
    */
-  val VIEW_HANDLER_ACTOR = FreemarkerViewHandler()
+  lazy val VIEW_HANDLER_ACTOR = FreemarkerViewHandler()
 
   /**
    * Actor responsible for routing requests
    */
-  val ROUTER_ACTOR = Router()
+  lazy val ROUTER_ACTOR = Router()
 
  /**
    * Map holding routes. A route is a regular expression that maps to a

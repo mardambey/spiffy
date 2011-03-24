@@ -64,7 +64,7 @@ class Router extends Actor {
     // decide where to route this request
     case ReqResCtx(req, res, ctx) => {
       // strip away the application root to get the URI to act on
-      val uri = req.getRequestURI.substring(SpiffyConfig.APPROOT_LENGTH)
+      val uri = req.getRequestURI.substring(SpiffyConfig().APPROOT_LENGTH)
 
       // attempt to route the request and return a 404 if not possible
       if (route(uri, req, res, ctx) == false) {
@@ -88,7 +88,7 @@ class Router extends Actor {
    */ 
   def route(uri: String, req: SpiffyRequestWrapper, res: SpiffyResponseWrapper, ctx: AsyncContext): Boolean = {
     // iterate over the available routes and try to find one that matches the requested URL
-    SpiffyConfig.ROUTES foreach {
+    SpiffyConfig().ROUTES foreach {
       case (regex: Regex, controller) => {
 	val pattern = regex.pattern
 	val matcher = pattern.matcher(uri)
@@ -149,7 +149,7 @@ class Router extends Actor {
    * page not found error (http response code 404)
    */
   def notFound(req:SpiffyRequestWrapper, res:SpiffyResponseWrapper, ctx:AsyncContext) : Boolean = {
-    SpiffyConfig.NOT_FOUND_ACTOR ! ReqResCtx(req, res, ctx)
+    SpiffyConfig().NOT_FOUND_ACTOR ! ReqResCtx(req, res, ctx)
     res.getWriter.write("404 - not found")
     ctx.complete
     return false

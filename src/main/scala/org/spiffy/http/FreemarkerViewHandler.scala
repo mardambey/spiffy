@@ -37,7 +37,7 @@ class FreemarkerViewHandler extends Actor
 
   val freemarker = new Configuration()
   // initialize Freemarker
-  freemarker.setDirectoryForTemplateLoading(new File(SpiffyConfig.WEBROOT + "/WEB-INF/ftl"))
+  freemarker.setDirectoryForTemplateLoading(new File(SpiffyConfig().WEBROOT + "/WEB-INF/ftl"))
   freemarker.setObjectWrapper(new DefaultObjectWrapper())
 
   /**
