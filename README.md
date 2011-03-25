@@ -1,7 +1,15 @@
 ﻿What is Spiffy?
 ================
 
-Spiffy is a web framework using Scala, Akka (a Scala actor implementation), and the Java Servelet 3.0 API. It makes use of the the async interface and aims to provide a massively parallel and scalable environment for web applications. Spiffy's various components are all based on the idea that they need to be independent minimalistic modules that do small amounts of work very quickly and hand off the request to the next component in the pipeline. After the last component is done processing the request it signals the servlet container by "completing" the request and sending it back to the client. 
+Spiffy...
+
+* is written in Scala
+* uses the fantastic Akka library and actors to scale
+* uses servlet API 3.0 for asynchronous request handling
+* is modular (replacing components is straight forward)
+* uses DSLs to cut down on code where you don't want it
+
+Spiffy is a web framework using Scala, Akka (a Scala actor implementation), and the Java Servelet 3.0 API. It makes use of the the async interface and aims to provide a massively parallel and scalable environment for web applications. Spiffy's various components are all based on the idea that they need to be independent minimalistic modules that do small amounts of work very quickly and hand off the request to the next component in the pipeline. After the last component is done processing the request it signals the servlet container by "completing" the request and sending it back to the client.
 
 Quick example
 -------------
@@ -21,6 +29,28 @@ Write the controller:
 
     def receive = {
         
+        // handles "news/add/"
+        case ControllerMsg(List("news", "save"), req, res, ctx) => {
+
+            // run validation on the request using Spiffy's validation DSL
+
+            var errors:Map[String, Set[String]] = validate (req) (
+
+                "email" as email confirmedBy "email_confirm",
+                "email_confirm" as email,
+                "title" as (string, 32),
+                "body" as string,
+                "tag" as string optional
+        
+            ) match {
+                case Some(List(errs,warns)) => { // Problem validating
+                    errs
+                }
+
+                case None => None.toMap // passed validation        
+            }
+        }
+
         // handles "/news/"
         case ControllerMsg(List("news"), req, res, ctx) => {
 
@@ -39,9 +69,8 @@ Write the controller:
 
             // ask the view to render
             view() ! ViewMsg("newsView", params, req, res, ctx)
-        }
+        }    
     }
-
 
 Then create some templates. You can find more about this example by looking at [NewsController](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/sample/controllers/NewsController.scala) and [SpiffyConfig](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/config/SpiffyConfig.scala)    
 
