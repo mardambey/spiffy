@@ -45,8 +45,7 @@ class FreemarkerViewHandler extends Actor
    */
   def receive = {
     // render the view
-    case List(template:String, map:Map[Any, Any], List(req: SpiffyRequestWrapper, res: SpiffyResponseWrapper, ctx:AsyncContext)) => {
-      
+    case ViewMsg(template, map, req, res, ctx) => {      
       try {
 	val temp = freemarker.getTemplate(template + ".ftl");
 	val h = new HashMap[Any, Any]

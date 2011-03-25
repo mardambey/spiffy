@@ -137,13 +137,16 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
     // index page, no code, just text
     """^/$""".r -> "Welcome to Spiffy!",
 
-    // login
-    new Regex("""^/(login)/$""") -> AuthController(),
+    // main news page
+    new Regex("""^/(news)/$""") -> NewsController(),
 
-    // logout
-    new Regex("""^/(logout)/$""") -> AuthController(),
+    // form to add some news
+    new Regex("""^/(news)/(add)/$""") -> NewsController(),
 
-    // checkProfile
-    new Regex("""^/(checkProfile)/$""") -> ProfileController()
+    // save news, doesnt really save, just shows confirmation
+    new Regex("""^/(news)/(save)/$""") -> NewsController(),
+  
+    // view some news by id
+    new Regex("""^/(news)/(view)/(\d+)/$""") -> NewsController()
   )
 }

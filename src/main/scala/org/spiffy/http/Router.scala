@@ -102,7 +102,7 @@ class Router extends Actor {
 	      // TODO: should this call any hooks?
               res.getWriter.write(s)
 	      ctx.complete
-              return true;
+              return true
             }
 
 	    // route maps to an actor representing a controller, send it a message 
@@ -115,13 +115,13 @@ class Router extends Actor {
 	      if (ctrl == None) return false
 
               val cnt = matcher.groupCount
-              var params = List[Any]()
+              var params = new scala.collection.mutable.MutableList[Any]()
 
-              for (i <- 1 to cnt) params = List(matcher.group(i)) ::: params
+              for (i <- 1 to cnt) params += matcher.group(i)
 	      
 	      // message the controller with the parameters that it needs, request, response, and context
 	      // TODO: review this, its not safe
-	      ctrl ! (params :: req :: res :: List(ctx))
+	      ctrl ! ControllerMsg(params.toList ,req, res, ctx)
 
 	      // done, tell the caller everything went ok
 	      return true

@@ -17,16 +17,16 @@ trait Validation {
 
       if (err != None) {
 	if (v.opt) { // optional, add as warning
-	  var strings = warnings.getOrElse(v.keyName, Set[String]())	 
+	  var strings = warnings.getOrElse(v.keyName, Set[String]())
 	  strings += err.get
 	  warnings += v.keyName -> strings
 	} else { // error, add to errors
-	  var strings = errors.getOrElse(v.keyName, Set[String]())	  
+	  var strings = errors.getOrElse(v.keyName, Set[String]())
 	  strings += err.get
 	  errors += v.keyName -> strings
 	}
       }
-    
+
       try {
 	if (v.confirm != None.toString && !req.getParameter(v.confirm).equals(req.getParameter(v.keyName))) {
 	  var strings = errors.getOrElse(v.keyName, Set[String]())
@@ -34,7 +34,7 @@ trait Validation {
 	  errors += v.keyName -> strings
 	}
       } catch {
-	case e:Exception => println(e.getMessage())
+	case e:Exception => //println(e.getMessage())
       }
     }
 
@@ -66,9 +66,9 @@ trait Validation {
 
     def validate(req:SpiffyRequestWrapper) : Option[String] = {
       // run validator
-      validator(SpiffyValidatorArgs(keyName, req, args))     
+      validator(SpiffyValidatorArgs(keyName, req, args))
     }
-  }  
+  }
 }
 
 class SpiffyValidatorArgs(val field:String, val req:SpiffyRequestWrapper, val args:Array[Any])
@@ -93,9 +93,9 @@ object string extends SpiffyValidator {
 
 object email extends  SpiffyValidator {
   val emailRegex = """([\w\d\-\_]+)(\+\d+)?@([\w\d\-\.]+)""".r
-  def apply(args:SpiffyValidatorArgs) : Option[String] = {    
-    try {   
-      if (emailRegex.pattern.matcher(args.req.getParameter(args.field)).matches) { 
+  def apply(args:SpiffyValidatorArgs) : Option[String] = {
+    try {
+      if (emailRegex.pattern.matcher(args.req.getParameter(args.field)).matches) {
 	None
       } else {
 	Some(args.field + "(" + args.req.getParameter(args.field) + "): error!")
