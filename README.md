@@ -74,6 +74,11 @@ Write the controller:
 
 Then create some templates. You can find more about this example by looking at [NewsController](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/sample/controllers/NewsController.scala) and [SpiffyConfig](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/config/SpiffyConfig.scala)    
 
+At the moment, in order to use Spiffy you must build the jar (mvn jar:jar) and add it to your applications classpath. You must also define the following environment variable (context.xml will do):
+
+    <Environment name="SpiffyConfigObject" value="org.spiffy.config.SpiffyBuiltinConfig" type="java.lang.String"/>
+
+You need to replace `org.spiffy.config.SpiffyBuiltinConfig` with an object that extends `org.spiffy.config.SpiffyConfig` and provides all the needed values. Take a look at [SpiffyConfig](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/config/SpiffyConfig.scala) for an example.
 
 How does Spiffy use Scala (Akka) actors?
 ----------------------------------------
