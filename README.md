@@ -28,8 +28,8 @@ Write the controller:
             val params = loadNews
             view() ! ViewMsg("news", params, req, res, ctx)
 
-        // handles "/news/view/$newsId/"
-        case ControllerMsg(List("news", "view", newsId), req, res, ctx) => {
+            // handles "/news/view/$newsId/"
+            case ControllerMsg(List("news", "view", newsId), req, res, ctx) => {
 
             // usually you want to load the item, in this example we dont
             // set the params that the view will render
