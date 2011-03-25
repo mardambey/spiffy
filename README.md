@@ -27,17 +27,21 @@ Write the controller:
             // load up news and stuff in map then render
             val params = loadNews
             view() ! ViewMsg("news", params, req, res, ctx)
+        }
 
-            // handles "/news/view/$newsId/"
-            case ControllerMsg(List("news", "view", newsId), req, res, ctx) => {
+        // handles "/news/view/$newsId/"
+        case ControllerMsg(List("news", "view", newsId), req, res, ctx) => {
 
             // usually you want to load the item, in this example we dont
-            // set the params that the view will render
-            val params:Map[Any,Any] = Map("newsId" -> newsId)
+            // load item and set the params that the view will render
+            val news = loadNewsItem(newsId)
+            val params:Map[Any,Any] = Map("news" -> news)
 
             // ask the view to render
             view() ! ViewMsg("newsView", params, req, res, ctx)
         }
+    }
+
 
 Then create some templates. You can find more about this example by looking at [NewsController](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/sample/controllers/NewsController.scala) and [SpiffyConfig](https://github.com/mardambey/spiffy/blob/master/src/main/scala/org/spiffy/config/SpiffyConfig.scala)    
 
