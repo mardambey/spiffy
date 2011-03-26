@@ -1,0 +1,29 @@
+!!! XML
+!!!
+%html
+	%head
+		%title Spiffy!
+	%body
+		%form{:method=>"post", :action=>"/spiffy/news/save/"}
+			%div
+				%label{:for=>"title"} Title:
+			%div
+				%input{:type=>"text", :name=>"title", :id=>"title"}
+			%div
+				%label{:for=>"email"} Email:
+			%div
+				%input{:type=>"text", :name=>"email", :id=>"email"}			
+			%div
+				%label{:for=>"email_confirm"} Confirm Email:
+			%div
+				%input{:type=>"text", :name=>"email_confirm", :id=>"email_confirm"}
+			%div
+				%label{:for=>"body"} Body:
+			%div
+				%textarea{:name=>"body", :id=>"body"}
+			%div
+				%label{:for=>"tags"} Tags:
+			%div
+				%input{:type=>"text", :name=>"tags", :id=>"tags"}
+
+			%input{:type=>"submit", :name=>"add", :value=>"add"}

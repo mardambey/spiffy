@@ -1,0 +1,18 @@
+-@ val errors:List[String]
+-@ val newsId:String
+!!! XML
+!!!
+%html 
+	%head 
+		%title Spiffy!
+	%body
+	- if (errors != None && errors.size > 0)
+		%div#errors
+			%ul
+				- for (msg <- errors)
+					%li Error: #{msg}    
+	- else
+		%div You added item #{newsId}!
+	%span
+		%a{:href=>"/spiffy/news/"} Main page
+

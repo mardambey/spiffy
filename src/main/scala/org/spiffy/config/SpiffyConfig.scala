@@ -110,7 +110,7 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
   /**
    * The timeout value for the asynchronous request in microseconds
    */
-  val ASYNC_TIMEOUT = 1000
+  val ASYNC_TIMEOUT = 5000
 
   /**
    * Actor to be notified in case of a 404.
@@ -120,7 +120,7 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
   /**
    * Actor responsible for rendeing views
    */
-  lazy val VIEW_HANDLER_ACTOR = FreemarkerViewHandler()
+  lazy val VIEW_HANDLER_ACTOR = ScalateViewHandler()
 
   /**
    * Actor responsible for routing requests

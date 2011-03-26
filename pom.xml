@@ -1,4 +1,7 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project 
+	xmlns="http://maven.apache.org/POM/4.0.0" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.spiffy</groupId>
 	<artifactId>spiffy</artifactId>
@@ -17,29 +20,41 @@
 			<url>http://scala-tools.org/repo-releases</url>
 		</repository>
 
-<repository>
-  <id>Akka</id>
-  <name>Akka Maven2 Repository</name>
-  <url>http://www.scalablesolutions.se/akka/repository/ </url>
-</repository>
+    <repository>
+      <id>Akka</id>
+      <name>Akka Maven2 Repository</name>
+      <url>http://www.scalablesolutions.se/akka/repository/ </url>
+    </repository>
  
-<repository>
-  <id>Multiverse</id>
-  <name>Multiverse Maven2 Repository</name>
-  <url>http://multiverse.googlecode.com/svn/maven-repository/releases/</url>
-</repository>
+    <repository>
+      <id>Multiverse</id>
+      <name>Multiverse Maven2 Repository</name>
+      <url>http://multiverse.googlecode.com/svn/maven-repository/releases/</url>
+    </repository>
  
-<repository>
-  <id>GuiceyFruit</id>
-  <name>GuiceyFruit Maven2 Repository</name>
-  <url>http://guiceyfruit.googlecode.com/svn/repo/releases/ </url>
-</repository>
+    <repository>
+      <id>GuiceyFruit</id>
+      <name>GuiceyFruit Maven2 Repository</name>
+      <url>http://guiceyfruit.googlecode.com/svn/repo/releases/ </url>
+    </repository>
  
-<repository>
-  <id>JBoss</id>
-  <name>JBoss Maven2 Repository</name>
-  <url>https://repository.jboss.org/nexus/content/groups/public/ </url>
-</repository>
+    <repository>
+      <id>JBoss</id>
+      <name>JBoss Maven2 Repository</name>
+      <url>https://repository.jboss.org/nexus/content/groups/public/ </url>
+    </repository>
+
+		<repository>
+			<id>fusesource.m2</id>
+			<name>FuseSource Public Repository</name>
+			<url>http://repo.fusesource.com/nexus/content/repositories/public</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+		</repository>
 
 	</repositories>
 
@@ -53,11 +68,24 @@
 
 	<dependencies>
 
-<dependency>
-    <groupId>org.freemarker</groupId>
-    <artifactId>freemarker</artifactId>
-    <version>2.3.14</version>
-</dependency>
+		<dependency>
+			<groupId>org.scala-lang</groupId>
+			<artifactId>scala-compiler</artifactId>
+			<version>2.8.1</version>  
+		</dependency>
+
+
+		<dependency>
+			<groupId>org.fusesource.scalate</groupId>
+			<artifactId>scalate-core</artifactId>
+			<version>1.4.1</version>  
+		</dependency>
+
+		<dependency>
+	    <groupId>org.freemarker</groupId>
+	    <artifactId>freemarker</artifactId>
+	    <version>2.3.14</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.scala-lang</groupId>
@@ -71,75 +99,79 @@
 			<version>7.0.2</version>
 		</dependency>
 
-	<dependency>
-  	<groupId>se.scalablesolutions.akka</groupId>
-  	<artifactId>akka-actor</artifactId>
-  	<version>1.1-SNAPSHOT</version>
-	</dependency>
+		<dependency>
+			<groupId>se.scalablesolutions.akka</groupId>
+	  	<artifactId>akka-actor</artifactId>
+			<version>1.1-SNAPSHOT</version>
+		</dependency>
  
+	</dependencies>
 
-		</dependencies>
+		<build>
+			<sourceDirectory>src/main/java</sourceDirectory>
+			<plugins>
+			
+				<plugin>
+					<groupId>org.zeroturnaround</groupId>
+					<artifactId>jrebel-maven-plugin</artifactId>
+					<executions>
+						<execution>
+							<id>generate-rebel-xml</id>
+							<phase>process-resources</phase>
+							<goals>
+								<goal>generate</goal>
+							</goals>
+						</execution>
+					</executions>
+				</plugin>
 
-    <build>
-        <sourceDirectory>src/main/java</sourceDirectory>
-        <plugins>
+				<plugin>
+					<groupId>org.scala-tools</groupId>
+          <artifactId>maven-scala-plugin</artifactId>
+					<executions>
+						<execution>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<scalaVersion>${scala.version}</scalaVersion>
+				</configuration>
+			</plugin>
 
-<plugin>
-  <groupId>org.zeroturnaround</groupId>
-  <artifactId>jrebel-maven-plugin</artifactId>
-  <executions>
-    <execution>
-      <id>generate-rebel-xml</id>
-      <phase>process-resources</phase>
-      <goals>
-        <goal>generate</goal>
-      </goals>
-    </execution>
-  </executions>
-</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-eclipse-plugin</artifactId>
+				<configuration>
+					<downloadSources>true</downloadSources>
+					<buildcommands>
+						<buildcommand>ch.epfl.lamp.sdt.core.scalabuilder</buildcommand>
+					</buildcommands>
+					<additionalProjectnatures>
+						<projectnature>ch.epfl.lamp.sdt.core.scalanature</projectnature>
+					</additionalProjectnatures>
+				<classpathContainers>
+					<classpathContainer>org.eclipse.jdt.launching.JRE_CONTAINER</classpathContainer>
+					<classpathContainer>ch.epfl.lamp.sdt.launching.SCALA_CONTAINER</classpathContainer>
+				</classpathContainers>
+				</configuration>
+			</plugin>
 
-            <plugin>
-                <groupId>org.scala-tools</groupId>
-                <artifactId>maven-scala-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <scalaVersion>${scala.version}</scalaVersion>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-eclipse-plugin</artifactId>
-                <configuration>
-                    <downloadSources>true</downloadSources>
-                    <buildcommands>
-                        <buildcommand>ch.epfl.lamp.sdt.core.scalabuilder</buildcommand>
-                    </buildcommands>
-                    <additionalProjectnatures>
-                        <projectnature>ch.epfl.lamp.sdt.core.scalanature</projectnature>
-                    </additionalProjectnatures>
-                    <classpathContainers>
-                        <classpathContainer>org.eclipse.jdt.launching.JRE_CONTAINER</classpathContainer>
-                        <classpathContainer>ch.epfl.lamp.sdt.launching.SCALA_CONTAINER</classpathContainer>
-                    </classpathContainers>
-                </configuration>
-            </plugin>
-	        </plugins>
-    </build>
-    <reporting>
-        <plugins>
-            <plugin>
-                <groupId>org.scala-tools</groupId>
-                <artifactId>maven-scala-plugin</artifactId>
-                <configuration>
-                    <scalaVersion>${scala.version}</scalaVersion>
-                </configuration>
-            </plugin>
-        </plugins>
-    </reporting>
+		</plugins>
+
+	</build>
+
+	<reporting>
+		<plugins>
+			<plugin>
+				<groupId>org.scala-tools</groupId>
+				<artifactId>maven-scala-plugin</artifactId>
+				<configuration>
+					<scalaVersion>${scala.version}</scalaVersion>
+				</configuration>
+			</plugin>
+  	</plugins>
+	</reporting>
+
 </project>

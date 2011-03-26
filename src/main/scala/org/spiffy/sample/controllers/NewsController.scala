@@ -1,6 +1,7 @@
 package org.spiffy.sample.controllers
 
 import scala.util.matching.Regex
+import scala.collection.mutable.ListBuffer
 import javax.servlet._
 import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
 import Console._
@@ -12,12 +13,10 @@ import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.actor.SupervisorFactory
 import akka.config.Supervision._
 
-import org.spiffy.http.{FreemarkerViewHandler => view}
+import org.spiffy.http.{ScalateViewHandler => view}
 import org.spiffy.http._
 import org.spiffy.validation._
 import org.spiffy.sample.validation._
-
-import java.util.LinkedList
 
 /**
  * Basic news controller that uses some of Spiffy's features.
@@ -61,7 +60,7 @@ class NewsController
       val params:Map[Any,Any] = Map("newsId" -> newsId)
 
       // ask the view to render
-      view() ! ViewMsg("newsView", params, req, res, ctx)
+      view() ! ViewMsg("newsView.scaml", params, req, res, ctx)
     }
 
     // handles "news/add/"
@@ -84,24 +83,24 @@ class NewsController
       }
 
       // validating all error messages in linked list
-      val err = errors2LinkedList(errors)
+	val err = ListBuffer[String]()
+      errors foreach { e => { e._2 foreach { err += _ }}}
       
       // just assign a fake id for now since we dont really add anything
-      val newsId = 547
+      val newsId = "547"
 
-      val params = Map[Any,Any]("newsId" -> newsId, "errors" -> err.getOrElse(null))
-      // TODO: check if the given profile information is valid      
-      view() ! ViewMsg("newsSave", params, req, res, ctx)
+      val params = Map[Any,Any]("newsId" -> newsId, "errors" -> err.toList)      
+      view() ! ViewMsg("newsSave.scaml", params, req, res, ctx)
     }
 
     // handles main new page
     case ControllerMsg(List("news"), req, res, ctx) => {
-      view() ! ViewMsg("news", None.toMap[Any, Any], req, res, ctx)
+      view() ! ViewMsg("news.scaml", None.toMap[Any, Any], req, res, ctx)
     }
    
     // shows form that adds news
     case ControllerMsg(List("news", "add"), req, res, ctx) => {
-      view() ! ViewMsg("newsAdd", None.toMap[Any, Any], req, res, ctx)
+      view() ! ViewMsg("newsAdd.scaml", None.toMap[Any, Any], req, res, ctx)
     }
 
     // catch all
