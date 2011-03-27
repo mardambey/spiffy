@@ -6,6 +6,7 @@ import scala.reflect.New
 
 import org.spiffy.http._
 import org.spiffy.Helpers.companion
+import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
 
 import javax.naming.InitialContext
 
@@ -138,15 +139,15 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
     """^/$""".r -> "Welcome to Spiffy!",
 
     // main news page
-    new Regex("""^/(news)/$""") -> NewsController(),
+    new Regex("""^/(news)/$""") -> pool(classOf[NewsController], 100),
 
     // form to add some news
-    new Regex("""^/(news)/(add)/$""") -> NewsController(),
+    new Regex("""^/(news)/(add)/$""") -> pool(classOf[NewsController], 100),
 
     // save news, doesnt really save, just shows confirmation
-    new Regex("""^/(news)/(save)/$""") -> NewsController(),
+    new Regex("""^/(news)/(save)/$""") -> pool(classOf[NewsController], 100),
   
     // view some news by id
-    new Regex("""^/(news)/(view)/(\d+)/$""") -> NewsController()
+    new Regex("""^/(news)/(view)/(\d+)/$""") -> pool(classOf[NewsController], 100)
   )
 }

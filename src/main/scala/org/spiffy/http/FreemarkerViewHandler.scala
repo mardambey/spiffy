@@ -9,13 +9,11 @@ import javax.servlet._
 import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
 import scala.collection.JavaConversions._
 
+import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
+
 import org.spiffy.config._
 
-import akka.dispatch.{Dispatchers, MessageDispatcher}
-import akka.actor.ActorRegistry
 import akka.actor.Actor
-import akka.actor.SupervisorFactory
-import akka.config.Supervision._
 
 import Console._
 import java.util.{Map => JMap}
@@ -30,11 +28,6 @@ import java.util.{Map => JMap}
  */
 class FreemarkerViewHandler extends Actor
 {
-  /**
-   * Set the dispatcher
-   */
-  self.dispatcher = FreemarkerViewHandler.dispatcher
-
   val freemarker = new Configuration()
   // initialize Freemarker
   freemarker.setDirectoryForTemplateLoading(new File(SpiffyConfig().WEBROOT + "/WEB-INF/ftl"))
@@ -70,41 +63,6 @@ class FreemarkerViewHandler extends Actor
 }
 
 object FreemarkerViewHandler {
-
-  // Count of actors that will balance the load
-  val ACTORS_COUNT = 100
-
-  /*
-   * Initialization of the smart work stealing dispatcher that polls messages from
-   * the mailbox of a busy actor and finds other actor in the pool that can process
-   * the message.
-   */
-  val workStealingDispatcher = Dispatchers.newExecutorBasedEventDrivenWorkStealingDispatcher("pooled-dispatcher")
-  var dispatcher = workStealingDispatcher
-  .withNewThreadPoolWithLinkedBlockingQueueWithUnboundedCapacity
-  .setCorePoolSize(ACTORS_COUNT)
-  .buildThreadPool
-
-  /*
-   * Creates list of actors the will be supervized
-   */
-  def createListOfSupervizedActors(poolSize: Int): List[Supervise] = {
-    (1 to poolSize toList).foldRight(List[Supervise]()) {
-      (i, list) => Supervise(Actor.actorOf( { new FreemarkerViewHandler() } ).start, Permanent) :: list
-    }
-  }
-
-  val supervisor = SupervisorFactory(
-    SupervisorConfig(
-      OneForOneStrategy(List(classOf[Exception]), 3, 1000),
-      createListOfSupervizedActors(ACTORS_COUNT))).newInstance
-
-  // Starts supervisor and all supervised actors
-  supervisor.start
-
-  def apply() = ActorRegistry.actorsFor[FreemarkerViewHandler](classOf[FreemarkerViewHandler]).head
-
-  // supervisor.stop
-  // supervisor.shutdown
-
+  val actor = pool(classOf[FreemarkerViewHandler], 100)
+  def apply() = actor
 }

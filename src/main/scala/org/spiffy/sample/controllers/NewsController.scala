@@ -7,11 +7,6 @@ import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
 import Console._
 
 import akka.actor.Actor
-import akka.actor.Actor._
-import akka.actor.ActorRegistry
-import akka.dispatch.{Dispatchers, MessageDispatcher}
-import akka.actor.SupervisorFactory
-import akka.config.Supervision._
 
 import org.spiffy.http.{ScalateViewHandler => view}
 import org.spiffy.http._
@@ -24,18 +19,10 @@ import org.spiffy.sample.validation._
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
 class NewsController
-  extends Actor 
+  extends Actor
   with Validation
   with ValidationHelpers
    {
-  /**
-   * Set the dispatcher.
-   * This does not to be done if your actor does not use a special
-   * dispatcher. This controllers shows how a work stealing dispatcher
-   * can be used to distribute load across several actors.
-   */
-  self.dispatcher = NewsController.dispatcher
-
   /**
    * Handles all incoming messages for this controller.
    * The receive method will be sent all the requests destined for
@@ -57,7 +44,7 @@ class NewsController
     // handles "news/view/$newsId/"
     case ControllerMsg(List("news", "view", newsId), req, res, ctx) => {
       // set the params that the view will render
-      val params:Map[Any,Any] = Map("newsId" -> newsId)
+      val params:Map[Any,Any] = Map("newsId" -> newsId, "actor" -> self.toString())
 
       // ask the view to render
       view() ! ViewMsg("newsView.scaml", params, req, res, ctx)
@@ -109,43 +96,4 @@ class NewsController
       println(getClass() + ": ignoring the following: " + ignore)
     }
   }
-}
-
-object NewsController {
-
-  // Count of actors that will balance the load
-  val ACTORS_COUNT = 100
-
-  /*
-   * Initialization of the smart work stealing dispatcher that polls messages from
-   * the mailbox of a busy actor and finds other actor in the pool that can process
-   * the message.
-   */
-  val workStealingDispatcher = Dispatchers.newExecutorBasedEventDrivenWorkStealingDispatcher("pooled-dispatcher")
-  var dispatcher = workStealingDispatcher
-  .withNewThreadPoolWithLinkedBlockingQueueWithUnboundedCapacity
-  .setCorePoolSize(ACTORS_COUNT)
-  .buildThreadPool
-
-  /*
-   * Creates list of actors the will be supervized
-   */
-  def createListOfSupervizedActors(poolSize: Int): List[Supervise] = {
-    (1 to poolSize toList).foldRight(List[Supervise]()) {
-      (i, list) => Supervise(Actor.actorOf( { new NewsController() } ).start, Permanent) :: list
-    }
-  }
-
-  val supervisor = SupervisorFactory(
-    SupervisorConfig(
-      OneForOneStrategy(List(classOf[Exception]), 3, 1000),
-      createListOfSupervizedActors(ACTORS_COUNT))).newInstance
-
-  // Starts supervisor and all supervised actors
-  supervisor.start
-
-  def apply() = ActorRegistry.actorsFor[NewsController](classOf[NewsController]).head
-
-  // supervisor.stop
-  // supervisor.shutdown
 }

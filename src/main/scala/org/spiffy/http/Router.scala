@@ -1,21 +1,14 @@
 package org.spiffy.http
 
-import scala.collection.immutable.HashMap
-import scala.util.matching.Regex
-import javax.servlet._
-import http.{ HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest }
-import Console._
-import java.util.concurrent.{CountDownLatch, TimeUnit}
+import javax.servlet.AsyncContext
 
-import akka.actor.Actor._
-import akka.actor.ActorRegistry
+import scala.util.matching.Regex
+
 import akka.actor.{Actor,ActorRef}
-import akka.dispatch.{Dispatchers, MessageDispatcher}
-import akka.actor.SupervisorFactory
-import akka.config.Supervision._
 
 import org.spiffy.config.SpiffyConfig
 import org.spiffy.sample.controllers._
+import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
 
 /**
  * This is the main router class that is responsible for dispatching requests to
@@ -42,13 +35,7 @@ import org.spiffy.sample.controllers._
  *
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
-class Router extends Actor {
-
-  /**
-   * Set the dispatcher
-   */
-  self.dispatcher = Router.dispatcher
-  
+class Router extends Actor {  
   /**
    * Map that holds all controllers by class and instance of that classs
    */
@@ -157,41 +144,6 @@ class Router extends Actor {
 }
 
 object Router {
-
-  // Count of actors that will balance the load
-  val ACTORS_COUNT = 100
-
-  /*
-   * Initialization of the smart work stealing dispatcher that polls messages from
-   * the mailbox of a busy actor and finds other actor in the pool that can process
-   * the message.
-   */
-  val workStealingDispatcher = Dispatchers.newExecutorBasedEventDrivenWorkStealingDispatcher("pooled-dispatcher")
-  var dispatcher = workStealingDispatcher
-  .withNewThreadPoolWithLinkedBlockingQueueWithUnboundedCapacity
-  .setCorePoolSize(ACTORS_COUNT)
-  .buildThreadPool
-
-  /*
-   * Creates list of actors the will be supervized
-   */
-  def createListOfSupervizedActors(poolSize: Int): List[Supervise] = {
-    (1 to poolSize toList).foldRight(List[Supervise]()) {
-      (i, list) => Supervise(Actor.actorOf( { new Router() } ).start, Permanent) :: list
-    }
-  }
-
-  val supervisor = SupervisorFactory(
-    SupervisorConfig(
-      OneForOneStrategy(List(classOf[Exception]), 3, 1000),
-      createListOfSupervizedActors(ACTORS_COUNT))).newInstance
-
-  // Starts supervisor and all supervised actors
-  supervisor.start
-
-  def apply() = ActorRegistry.actorsFor[Router](classOf[Router]).head
-
-  // supervisor.stop
-  // supervisor.shutdown
-
+  val actor = pool(classOf[Router], 100)
+  def apply() = actor
 }
