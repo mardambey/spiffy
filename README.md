@@ -8,6 +8,7 @@ Spiffy...
 * uses servlet API 3.0 for asynchronous request handling
 * is modular (replacing components is straight forward)
 * uses DSLs to cut down on code where you don't want it
+* supports request hooks around controllers
 
 Spiffy is a web framework using Scala, Akka (a Scala actor implementation), and the Java Servelet 3.0 API. It makes use of the the async interface and aims to provide a massively parallel and scalable environment for web applications. Spiffy's various components are all based on the idea that they need to be independent minimalistic modules that do small amounts of work very quickly and hand off the request to the next component in the pipeline. After the last component is done processing the request it signals the servlet container by "completing" the request and sending it back to the client.
 
