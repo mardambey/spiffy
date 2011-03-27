@@ -116,7 +116,7 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
   /**
    * Actor to be notified in case of a 404.
    */
-  lazy val NOT_FOUND_ACTOR = Actor.actorOf[HttpErrorHandler].start
+  lazy val NOT_FOUND_ACTOR = HttpErrorHandler()
 
   /**
    * Actor responsible for rendeing views

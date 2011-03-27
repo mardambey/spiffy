@@ -106,13 +106,15 @@ class Router extends Actor {
               var params = new scala.collection.mutable.MutableList[Any]()
 
               for (i <- 1 to cnt) params += matcher.group(i)
-	      
-	      // message the controller with the parameters that it needs, request, response, and context
+	      	      
+	      // lets check if we need to run any before hooks
 	      val comp = companion[BeforeHooks](ctrl.getActorClass.getName)
 
 	      if (comp != None) {
-		comp.before ! HookMsg(ctrl, ControllerMsg(params.toList ,req, res, ctx))
+		// run the first hook
+		comp.before(0) ! HookMsg(0, comp.before, ctrl, ControllerMsg(params.toList ,req, res, ctx))
 	      } else {
+		// message the controller with the parameters that it needs, request, response, and context
 		ctrl ! ControllerMsg(params.toList ,req, res, ctx)
 	      }
 

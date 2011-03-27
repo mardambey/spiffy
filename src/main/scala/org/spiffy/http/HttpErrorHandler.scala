@@ -2,6 +2,8 @@ package org.spiffy.http
 
 import akka.actor.Actor
 
+import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
+
 /**
  * This is the default error handler. It has basic error reporting
  * and lumps almost everything else as an internal server error.
@@ -28,4 +30,9 @@ class HttpErrorHandler extends Actor {
       }
     }
   }
+}
+
+object HttpErrorHandler {
+  val actor = pool(classOf[HttpErrorHandler], 100)
+  def apply() = actor
 }

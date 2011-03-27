@@ -100,6 +100,18 @@ class NewsController
   }
 }
 
+/**
+ * Companion object that defines before hooks to be ran.
+ */
 object NewsController extends BeforeHooks {
-  val before = actorOf[InternalRedirectingHook].start
+
+  /**
+   * Array of before hooks.
+   */
+  val hooks = Array(LoggerHook(), RandomErrorGeneratingHook(),InternalRedirectingHook())
+  
+  /**
+   * Run the following hooks when asked.
+   */
+  val before = hooks
 }
