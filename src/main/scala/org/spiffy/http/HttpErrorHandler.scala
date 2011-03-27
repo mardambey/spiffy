@@ -10,7 +10,7 @@ import akka.actor.Actor
  */
 class HttpErrorHandler extends Actor {
   def receive = {
-    case (errno:Int, ReqResCtx(req,res,ctx)) => {
+    case ((errno:Int, ReqResCtx(req,res,ctx))) => {
       errno match {
 
 	case 404 => {

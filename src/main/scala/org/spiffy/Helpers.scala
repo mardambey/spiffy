@@ -7,6 +7,11 @@ import akka.dispatch.{Dispatchers, MessageDispatcher}
 import akka.actor.SupervisorFactory
 import akka.config.Supervision._
 
+import javax.servlet.AsyncContext
+
+import org.spiffy.http._
+import org.spiffy.config.SpiffyConfig
+
 /**
  * Misc helpers and utilities.
  */
@@ -16,6 +21,15 @@ object Helpers {
    */
   def companion[T](name : String)(implicit man: Manifest[T]) : T = 
     Class.forName(name + "$").getField("MODULE$").get(man.erasure).asInstanceOf[T]
+
+  /**
+   * Helper method that sends back an error message indicating that Spiffy has encountered a
+   * page not found error (http response code 404)
+   */
+  def notFound(req:SpiffyRequestWrapper, res:SpiffyResponseWrapper, ctx:AsyncContext) : Boolean = {
+    SpiffyConfig().NOT_FOUND_ACTOR ! ((404, ReqResCtx(req, res, ctx)))
+    false
+  }
 }
 
 /**

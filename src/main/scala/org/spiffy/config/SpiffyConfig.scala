@@ -148,6 +148,9 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
     new Regex("""^/(news)/(save)/$""") -> pool(classOf[NewsController], 100),
   
     // view some news by id
-    new Regex("""^/(news)/(view)/(\d+)/$""") -> pool(classOf[NewsController], 100)
+    new Regex("""^/(news)/(view)/(\d+)/$""") -> pool(classOf[NewsController], 100),
+
+    // another way to view news by id, before hooks will catch this one
+    new Regex("""^/(news)/(see)/(\d+)/$""") -> pool(classOf[NewsController], 100)
   )
 }

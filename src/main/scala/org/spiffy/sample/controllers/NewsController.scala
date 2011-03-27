@@ -6,12 +6,14 @@ import javax.servlet._
 import http.{HttpServletRequestWrapper, HttpServletResponse, HttpServletRequest}
 import Console._
 
-import akka.actor.Actor
+import akka.actor.{Actor,ActorRef}
+import akka.actor.Actor._
 
 import org.spiffy.http.{ScalateViewHandler => view}
 import org.spiffy.http._
 import org.spiffy.validation._
 import org.spiffy.sample.validation._
+import org.spiffy.sample._
 
 /**
  * Basic news controller that uses some of Spiffy's features.
@@ -21,7 +23,7 @@ import org.spiffy.sample.validation._
 class NewsController
   extends Actor
   with Validation
-  with ValidationHelpers
+  with ValidationHelpers  
    {
   /**
    * Handles all incoming messages for this controller.
@@ -96,4 +98,8 @@ class NewsController
       println(getClass() + ": ignoring the following: " + ignore)
     }
   }
+}
+
+object NewsController extends BeforeHooks {
+  val before = actorOf[InternalRedirectingHook].start
 }

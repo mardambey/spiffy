@@ -7,6 +7,7 @@ import scala.util.matching.Regex
 import akka.actor.{Actor,ActorRef}
 
 import org.spiffy.config.SpiffyConfig
+import org.spiffy.Helpers._
 import org.spiffy.sample.controllers._
 import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
 
@@ -107,8 +108,13 @@ class Router extends Actor {
               for (i <- 1 to cnt) params += matcher.group(i)
 	      
 	      // message the controller with the parameters that it needs, request, response, and context
-	      // TODO: review this, its not safe
-	      ctrl ! ControllerMsg(params.toList ,req, res, ctx)
+	      val comp = companion[BeforeHooks](ctrl.getActorClass.getName)
+
+	      if (comp != None) {
+		comp.before ! HookMsg(ctrl, ControllerMsg(params.toList ,req, res, ctx))
+	      } else {
+		ctrl ! ControllerMsg(params.toList ,req, res, ctx)
+	      }
 
 	      // done, tell the caller everything went ok
 	      return true
@@ -129,18 +135,7 @@ class Router extends Actor {
 
     // could not find a route, 404
     return false
-  }
-
-  /**
-   * Helper method that sends back an error message indicating that Spiffy has encountered a
-   * page not found error (http response code 404)
-   */
-  def notFound(req:SpiffyRequestWrapper, res:SpiffyResponseWrapper, ctx:AsyncContext) : Boolean = {
-    SpiffyConfig().NOT_FOUND_ACTOR ! ReqResCtx(req, res, ctx)
-    res.getWriter.write("404 - not found")
-    ctx.complete
-    return false
-  }
+  } 
 }
 
 object Router {
