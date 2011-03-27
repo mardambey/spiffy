@@ -108,7 +108,7 @@ object NewsController extends BeforeHooks {
   /**
    * Array of before hooks.
    */
-  val hooks = Array(LoggerHook(), RandomErrorGeneratingHook(),InternalRedirectingHook())
+  val hooks = Array(LoggerHook(), InternalRedirectingHook())
   
   /**
    * Run the following hooks when asked.
