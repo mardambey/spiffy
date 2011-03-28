@@ -13,13 +13,13 @@ import org.spiffy.Helpers._
  */
 class RandomErrorGeneratingHook extends Actor {
   def receive = {
-    case h@ HookMsg(curHook, hooks, ctrl, msg) => {
+    case h @ HookMsg(curHook, hooks, spiffy, ht) => {
       val randomInt = new Random().nextInt(10)
       if (randomInt > 6) {
-	log.debug("[RandomErrorGeneratingHook] Running hook (will error) for " + ctrl)
-	notFound(msg.req, msg.res, msg.ctx)
+	log.debug("[RandomErrorGeneratingHook] Running hook (will error) for " + spiffy.ctrl)
+	notFound(spiffy.req, spiffy.res, spiffy.ctx)
       } else {
-	log.debug("[RandomErrorGeneratingHook] Running hook (will not error) for " + ctrl)
+	log.debug("[RandomErrorGeneratingHook] Running hook (will not error) for " + spiffy.ctrl)
 	(forward orElse call) (h)
       }
     }
@@ -40,13 +40,13 @@ object RandomErrorGeneratingHook {
  */
 class InternalRedirectingHook extends Actor {
   def receive = {
-    case h @ HookMsg(curHook, hooks, ctrl, msg @ ControllerMsg(route, req, res, ctx)) => {
+    case h @ HookMsg(curHook, hooks, spiffy, ht) => {
 
-      route match {
+      spiffy.route match {
 	case List("news", "see", id) => {
 	  log.debug("[InternalRedirectingHook] Redirecting see -> view for " + id)
 	  val newRoute = List("news", "view", id)
-	  val hk = HookMsg(curHook, hooks, ctrl, ControllerMsg(newRoute, req, res, ctx))
+	  val hk = HookMsg(curHook, hooks, Spiffy(newRoute, spiffy.vmsg, spiffy.req, spiffy.res, spiffy.ctx, spiffy.ctrl), ht)
 	  (forward orElse call) (hk)
 	}
 	case _ => {
@@ -73,8 +73,8 @@ object InternalRedirectingHook {
 class LoggerHook extends Actor {
 
   def receive = {
-    case h @ HookMsg(curHook, hooks, ctrl, msg) => {
-      log.debug("[LoggerHook] Running hook for " + ctrl)     
+    case h @ HookMsg(curHook, hooks, spiffy, ht) => {
+      log.debug("[LoggerHook] Running hook for " + spiffy.ctrl)
       (forward orElse call) (h)
     }
     case ignore => log.error("Ignored: " + ignore)
@@ -86,5 +86,49 @@ class LoggerHook extends Actor {
  */
 object LoggerHook {
   val actor = pool(classOf[LoggerHook], 100)
+  def apply() = actor
+}
+
+/**
+ * Sample logging hook.
+ */
+class AnotherAfterHook extends Actor {
+
+  def receive = {
+    case h @ HookMsg(curHook, hooks, spiffy, ht) => {
+      //log.debug("[AnotherAfterHook] Running hook for " + spiffy.ctrl)
+      (forward orElse call) (h)
+    }
+    case ignore => log.error("Ignored: " + ignore)
+  }
+}
+
+/**
+ * Companion object that pools the hook.
+ */
+object AnotherAfterHook {
+  val actor = pool(classOf[AnotherAfterHook], 100)
+  def apply() = actor
+}
+
+/**
+ * Sample logging hook.
+ */
+class AfterLoggerHook extends Actor {
+
+  def receive = {
+    case h @ HookMsg(curHook, hooks, spiffy, ht) => {
+      //log.debug("[AfterLoggerHook] Running hook for " + spiffy.ctrl)
+      (forward orElse call) (h)
+    }
+    case ignore => log.error("Ignored: " + ignore)
+  }
+}
+
+/**
+ * Companion object that pools the hook.
+ */
+object AfterLoggerHook {
+  val actor = pool(classOf[AfterLoggerHook], 100)
   def apply() = actor
 }

@@ -10,6 +10,7 @@ import org.spiffy.config.SpiffyConfig
 import org.spiffy.Helpers._
 import org.spiffy.sample.controllers._
 import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
+import org.spiffy.http.HookType._
 
 /**
  * This is the main router class that is responsible for dispatching requests to
@@ -106,16 +107,20 @@ class Router extends Actor {
               var params = new scala.collection.mutable.MutableList[Any]()
 
               for (i <- 1 to cnt) params += matcher.group(i)
-	      	      
+	      	      	      
 	      // lets check if we need to run any before hooks
-	      val comp = companion[BeforeHooks](ctrl.getActorClass.getName)
+	      try {
+		val comp = companion[BeforeHooks](ctrl.getActorClass.getName)
 
-	      if (comp != None) {
-		// run the first hook
-		comp.before(0) ! HookMsg(0, comp.before, ctrl, ControllerMsg(params.toList ,req, res, ctx))
-	      } else {
-		// message the controller with the parameters that it needs, request, response, and context
-		ctrl ! ControllerMsg(params.toList ,req, res, ctx)
+		if (comp != None) {
+		  // run the first hook
+		  comp.before(0) ! HookMsg(0, comp.before, Spiffy(params.toList , ViewMsg("", Map.empty), req, res, ctx, ctrl), Before)
+		}
+	      } catch {
+		case e:Exception => {
+		  // message the controller with the parameters that it needs, request, response, and context		  
+		  ctrl ! Spiffy(params.toList, ViewMsg("", Map.empty), req, res, ctx, ctrl)
+		}
 	      }
 
 	      // done, tell the caller everything went ok

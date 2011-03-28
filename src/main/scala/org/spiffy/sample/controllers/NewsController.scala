@@ -44,16 +44,16 @@ class NewsController
    */
   def receive = {     
     // handles "news/view/$newsId/"
-    case ControllerMsg(List("news", "view", newsId), req, res, ctx) => {
+    case s @ Spiffy(List("news", "view", newsId), vmsg, req, res, ctx, cls) => {
       // set the params that the view will render
       val params:Map[Any,Any] = Map("newsId" -> newsId, "actor" -> self.toString())
 
       // ask the view to render
-      view() ! ViewMsg("newsView.scaml", params, req, res, ctx)
+      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsView.scaml", params), req, res, ctx, cls) 
     }
 
     // handles "news/add/"
-    case ControllerMsg(List("news", "save"), req, res, ctx) => {
+    case s @ Spiffy(List("news", "save"), vmsg, req, res, ctx, cls) => {
 
       // run validation on the request
       var errors:Map[String, Set[String]] = validate (req) (
@@ -77,19 +77,19 @@ class NewsController
       
       // just assign a fake id for now since we dont really add anything
       val newsId = "547"
-
-      val params = Map[Any,Any]("newsId" -> newsId, "errors" -> err.toList)      
-      view() ! ViewMsg("newsSave.scaml", params, req, res, ctx)
+    
+      val params = Map[Any,Any]("newsId" -> newsId, "errors" -> err.toList)
+      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsSave.scaml", params), req, res, ctx, cls)
     }
 
     // handles main new page
-    case ControllerMsg(List("news"), req, res, ctx) => {
-      view() ! ViewMsg("news.scaml", None.toMap[Any, Any], req, res, ctx)
+    case s @ Spiffy(List("news"), vmsg, req, res, ctx, cls) => {
+      view() ! Spiffy(List("news"), ViewMsg("news.scaml", None.toMap[Any, Any]), req, res, ctx, cls) 
     }
    
     // shows form that adds news
-    case ControllerMsg(List("news", "add"), req, res, ctx) => {
-      view() ! ViewMsg("newsAdd.scaml", None.toMap[Any, Any], req, res, ctx)
+    case s @ Spiffy(List("news", "add"), vmsg, req, res, ctx, cls) => {
+      view() ! Spiffy(List("news", "add"), ViewMsg("newsAdd.scaml", None.toMap[Any, Any]), req, res, ctx, cls)
     }
 
     // catch all
@@ -103,15 +103,26 @@ class NewsController
 /**
  * Companion object that defines before hooks to be ran.
  */
-object NewsController extends BeforeHooks {
+object NewsController extends BeforeHooks with AfterHooks {
 
   /**
    * Array of before hooks.
    */
-  val hooks = Array(LoggerHook(), InternalRedirectingHook())
+  val beforeHooks = Array(LoggerHook(), InternalRedirectingHook())
   
   /**
    * Run the following hooks when asked.
    */
-  val before = hooks
+  val before = beforeHooks
+
+  /**
+   * Array of after hooks.
+   */
+  val afterHooks = Array(AfterLoggerHook(), AnotherAfterHook())
+
+  /**
+   * Run the following after hooks when asked.
+   */
+  val after = afterHooks
+
 }

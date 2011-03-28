@@ -6,8 +6,10 @@ import org.fusesource.scalate._
 
 import org.spiffy.config._
 import org.spiffy.{WorkStealingSupervisedDispatcherService => pool}
+import org.spiffy.Helpers._
+import org.spiffy.http.HookType._
 
-import akka.actor.Actor
+import akka.actor.{Actor,ActorRef}
 
 object ScalateEngine {
   val engine = new TemplateEngine(List(new File(SpiffyConfig().WEBROOT +  "/WEB-INF/scalate/")))
@@ -22,25 +24,24 @@ object ScalateEngine {
  *
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
-class ScalateViewHandler extends Actor
+class ScalateViewHandler extends  AfterHookEnabled
 {  
   val engine = ScalateEngine()
 
-  /**
-   * Responsible for rendering the view.
-   */
-  def receive = {
+  def render = {
     // render the view
-    case ViewMsg(template, params, req, res, ctx) => {      
+    case Spiffy(route, ViewMsg(template, params), req, res, ctx, ctrl) => {     
       val output = engine.layout(template , params.asInstanceOf[Map[String, Any]])
       if (res.getContentType == null) res.setContentType("text/html")
       res.getWriter.write(output)
       ctx.complete  
+      true
     }
 		    
     // catch all, never happens
     case ignore => {
       println("view render ignored: " + ignore)
+      true
     }
   }
 }
