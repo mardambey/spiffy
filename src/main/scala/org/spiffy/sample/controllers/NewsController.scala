@@ -39,24 +39,25 @@ class NewsController
    *
    * The previous route will create:
    *
-   * ControllerMessage(List("news", "view", "436"), req, res, ctx
+   * s @ R("news", "view", "436") // where s is of type Spiffy
    * 
    */
   def receive = {     
     // handles "news/view/$newsId/"
-    case s @ Spiffy(List("news", "view", newsId), vmsg, req, res, ctx, cls) => {
+    case s @ R("news", "view", newsId) => {
+    //case s @ Spiffy(List("news", "view", newsId), vmsg, req, res, ctx, cls) => {
       // set the params that the view will render
       val params:Map[Any,Any] = Map("newsId" -> newsId, "actor" -> self.toString())
 
       // ask the view to render
-      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsView.scaml", params), req, res, ctx, cls) 
+      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsView.scaml", params), s.req, s.res, s.ctx, s.ctrl) 
     }
 
     // handles "news/add/"
-    case s @ Spiffy(List("news", "save"), vmsg, req, res, ctx, cls) => {
+    case s @ R("news", "save") => {
 
       // run validation on the request
-      var errors:Map[String, Set[String]] = validate (req) (
+      var errors:Map[String, Set[String]] = validate (s.req) (
 	"email" as email confirmedBy "email_confirm",
 	"email_confirm" as email,
 	"title" as (string, 32),
@@ -79,17 +80,17 @@ class NewsController
       val newsId = "547"
     
       val params = Map[Any,Any]("newsId" -> newsId, "errors" -> err.toList)
-      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsSave.scaml", params), req, res, ctx, cls)
+      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsSave.scaml", params), s.req, s.res, s.ctx, s.ctrl)
     }
 
     // handles main new page
-    case s @ Spiffy(List("news"), vmsg, req, res, ctx, cls) => {
-      view() ! Spiffy(List("news"), ViewMsg("news.scaml", None.toMap[Any, Any]), req, res, ctx, cls) 
+    case s @ R("news") => {
+      view() ! Spiffy(List("news"), ViewMsg("news.scaml", None.toMap[Any, Any]), s.req, s.res, s.ctx, s.ctrl) 
     }
    
     // shows form that adds news
-    case s @ Spiffy(List("news", "add"), vmsg, req, res, ctx, cls) => {
-      view() ! Spiffy(List("news", "add"), ViewMsg("newsAdd.scaml", None.toMap[Any, Any]), req, res, ctx, cls)
+    case s @ R("news", "add") => {
+      view() ! Spiffy(List("news", "add"), ViewMsg("newsAdd.scaml", None.toMap[Any, Any]), s.req, s.res, s.ctx, s.ctrl)
     }
 
     // catch all

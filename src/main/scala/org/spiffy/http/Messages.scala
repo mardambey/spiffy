@@ -27,3 +27,14 @@ import HookType._
  * Message that is sent to hooks.
  */
 case class HookMsg(curHook:Int, hooks:Array[ActorRef], spiffy:Spiffy, h:HookType)
+
+/**
+ * Used when controllers want to match against a Spiffy
+ * object and wish to extract the route and parameters
+ * selectively.
+ */
+object R {
+  def unapplySeq (s:Spiffy) : Option[List[Any]] = {
+    Some(s.route)
+  }
+}
