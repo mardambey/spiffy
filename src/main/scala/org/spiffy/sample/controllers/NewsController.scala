@@ -45,12 +45,11 @@ class NewsController
   def receive = {     
     // handles "news/view/$newsId/"
     case s @ R("news", "view", newsId) => {
-    //case s @ Spiffy(List("news", "view", newsId), vmsg, req, res, ctx, cls) => {
       // set the params that the view will render
       val params:Map[Any,Any] = Map("newsId" -> newsId, "actor" -> self.toString())
 
       // ask the view to render
-      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsView.scaml", params), s.req, s.res, s.ctx, s.ctrl) 
+      view() ! s.copy(vmsg=ViewMsg("newsView.scaml", params)) 
     }
 
     // handles "news/add/"
@@ -80,17 +79,17 @@ class NewsController
       val newsId = "547"
     
       val params = Map[Any,Any]("newsId" -> newsId, "errors" -> err.toList)
-      view() ! Spiffy(List("news", "view", newsId), ViewMsg("newsSave.scaml", params), s.req, s.res, s.ctx, s.ctrl)
+      view() ! s.copy(vmsg = ViewMsg("newsSave.scaml", params))
     }
 
     // handles main new page
     case s @ R("news") => {
-      view() ! Spiffy(List("news"), ViewMsg("news.scaml", None.toMap[Any, Any]), s.req, s.res, s.ctx, s.ctrl) 
+      view() ! s.copy(vmsg = ViewMsg("news.scaml", None.toMap[Any, Any]))
     }
    
     // shows form that adds news
     case s @ R("news", "add") => {
-      view() ! Spiffy(List("news", "add"), ViewMsg("newsAdd.scaml", None.toMap[Any, Any]), s.req, s.res, s.ctx, s.ctrl)
+      view() ! s.copy(vmsg = ViewMsg("newsAdd.scaml", None.toMap[Any, Any]))
     }
 
     // catch all
