@@ -1,0 +1,50 @@
+%html
+	%head 
+		%title Listen
+		%script{:type=>"text/javascript",:src=>"http://www.google.com/jsapi"}
+		:javascript
+			google.load("jquery", "1.4.2");
+			function listen(last_modified, etag) {
+				$.ajax({
+					'beforeSend': function(xhr) {
+						xhr.setRequestHeader("If-None-Match", etag);
+						xhr.setRequestHeader("If-Modified-Since", last_modified);
+					},
+					url: '/spiffy/chat/listen/',
+					dataType: 'text',
+					type: 'get',
+					cache: 'false',
+					success: function(data, textStatus, xhr) {
+						etag = xhr.getResponseHeader('Etag');
+						last_modified = xhr.getResponseHeader('Last-Modified');
+						data = jQuery.trim(data);
+						$('#data').append(data);
+						/* Start the next long poll. */
+						listen(last_modified, etag);
+					},
+					error: function(xhr, textStatus, errorThrown) {
+						//$('#data').prepend(textStatus + ' | ' + errorThrown);
+					}
+				});
+			};
+
+			function send(data) {
+				$.post('/spiffy/chat/send/', {data: data})
+			}
+
+			google.setOnLoadCallback(function() {
+				/* Start the first long poll. */
+				/* setTimeout is required to let the browser know
+				the page is finished loading. */
+				setTimeout(function() {
+					listen('Thu, 1 Jan 1970 00:00:00 GMT', '0');
+				}, 500);
+			});		
+		:css
+			#data { margin: .5em; }
+			#data .msg { white-space: pre; font-family: courier; font-size: 14px; margin-bottom: .5em; margin-left: .5em; }
+	%body
+		%form{:method => "post"}
+			%input#sdata{:type => "text", :name => "data"}
+			%button{:type => "button", :onClick =>"javascript:send($('#sdata').val());"} send!
+		%div#data

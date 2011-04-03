@@ -34,6 +34,7 @@ class ScalateViewHandler extends  AfterHookEnabled
       val output = engine.layout(template , params.asInstanceOf[Map[String, Any]])
       if (res.getContentType == null) res.setContentType("text/html")
       res.getWriter.write(output)
+      res.getWriter.flush
       ctx.complete  
       true
     }
