@@ -3,43 +3,118 @@
 		%title Listen
 		%script{:type=>"text/javascript",:src=>"http://www.google.com/jsapi"}
 		:javascript
-			google.load("jquery", "1.4.2");
-			function listen(last_modified, etag) {
-				$.ajax({
-					'beforeSend': function(xhr) {
-						xhr.setRequestHeader("If-None-Match", etag);
-						xhr.setRequestHeader("If-Modified-Since", last_modified);
-					},
-					url: '/spiffy/chat/listen/',
-					dataType: 'text',
-					type: 'get',
-					cache: 'false',
-					success: function(data, textStatus, xhr) {
-						etag = xhr.getResponseHeader('Etag');
-						last_modified = xhr.getResponseHeader('Last-Modified');
-						data = jQuery.trim(data);
-						$('#data').append(data);
-						/* Start the next long poll. */
-						listen(last_modified, etag);
-					},
-					error: function(xhr, textStatus, errorThrown) {
-						//$('#data').prepend(textStatus + ' | ' + errorThrown);
-					}
-				});
+			google.load("jquery", "1.5.2");
+
+			// ============= CometSession implementation
+			//			
+			// constructor
+			function CometSession() {
+				// url to connect to
+				this.url = "";
+				// ready state: initial, opening, open, closing, closed
+				this.readyState = CometSession.READYSTATE_INITIAL;
+				// session key used to identify client
+				this.sessionKey = "";
+				// microseconds to wait before reestablishing connection
+				this.reconnTime = 5000;
+				this.currReconnTime = this.reconnTime;
+				// reconnTime will increase with the number of failed attempts
+				// until it reaches this value
+				this.maxReconnTime = 5 * 60 * 1000;
+
+				// Callbacks
+				this.onopen  = function()     {};
+				this.onread  = function(data) {};
+				this.onclose = function(code) {};
+
+				this.write = function(data) {
+					var self = this;
+					$.getJSON(this.url + "send/?s=" + this.sessionKey + "&d=" + data + "&jsoncallback=?", function(json) {
+						// TODO: handle errors / success
+					}).error(function() {
+						alert("error sending!!");
+					});
+
+				};
+
+				this.close = function() {
+				};
+
+				// Connects the session to the given url or uses default url
+				// * set readyState to opening
+				// * make get request on /handshake and pass json data as request param called "d"
+				// * expects sessionKey back in response body (session in json object)
+				// *** TODO ***
+				// Implement timeout and error handling.
+				this.connect = function(url) {					
+					if (typeof url == "undefined") url = this.url;
+					this.readyState = CometSession.READYSTATE_OPENING;
+					var self = this;
+					$.getJSON(this.url + "handshake/?d=&jsoncallback=?", function(json) {
+						self.sessionKey = json.session;
+						self.readyState = CometSession.READYSTATE_OPEN;					
+						self.onopen();
+						self.listen();
+					});
+				};
+
+				this.reestablish = function() {
+					var self = this;
+					setTimeout(function() { self.listen(); }, self.currReconnTime);
+					if (this.currReconnTime < this.maxReconnTime) this.currReconnTime *= 2;
+				};
+
+				this.listen = function() {
+					var self = this;
+					$.getJSON(this.url + "comet/?d=&s=" + self.sessionKey + "&jsoncallback=?", function(json,	status) {
+						self.onread(json);
+						self.currReconnTime = self.reconnTime;
+						if (status == "success") self.listen();
+					}).error(function() {
+						// the server disconnected us or there was a network 
+						// error, try to reestablish the connection
+						self.reestablish();
+					});
+				};			
+			}
+
+			// different states the session can be in
+			CometSession.prototype.READYSTATE_INITIAL = 0;
+			CometSession.prototype.READYSTATE_OPENING = 1;
+			CometSession.prototype.READYSTATE_OPEN = 2;
+			CometSession.prototype.READYSTATE_CLOSING = 3;
+			CometSession.prototype.READYSTATE_CLOSED = 4;
+
+			// data packet
+			CometSession.prototype.Packet = function() {
+				this.id = 0;
+				this.encoding = CometSession.PACKET_ENCODING_BASE64;
+				this.data = "{}";
 			};
 
+			// different packet encodings
+			CometSession.prototype.PACKET_ENCODING_TEXT = 0;
+			CometSession.prototype.PACKET_ENCODING_BASE64 = 1;
+
 			function send(data) {
-				$.post('/spiffy/chat/send/', {data: data})
+				session.write(data);
+			}
+
+			var session = new CometSession();
+
+			function init() {
+				session.onopen = function() {};
+				session.onread = function(data) { alert("onread: " + data.data) };
+				session.onclose = function(code) { alert("closed: " + code); };
+				session.connect("/spiffy/chat/");
 			}
 
 			google.setOnLoadCallback(function() {
 				/* Start the first long poll. */
 				/* setTimeout is required to let the browser know
 				the page is finished loading. */
-				setTimeout(function() {
-					listen('Thu, 1 Jan 1970 00:00:00 GMT', '0');
-				}, 500);
-			});		
+				setTimeout(function() { init(); }, 500);
+			});
 		:css
 			#data { margin: .5em; }
 			#data .msg { white-space: pre; font-family: courier; font-size: 14px; margin-bottom: .5em; margin-left: .5em; }

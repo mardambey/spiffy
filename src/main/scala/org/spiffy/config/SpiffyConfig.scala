@@ -111,7 +111,7 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
   /**
    * The timeout value for the asynchronous request in microseconds
    */
-  val ASYNC_TIMEOUT = 500000
+  val ASYNC_TIMEOUT = 1000 * 60 * 30
 
   /**
    * Actor to be notified in case of a 404.
@@ -156,10 +156,16 @@ object SpiffyBuiltinConfig extends SpiffyConfig {
     // prototype controller for comet sample
     new Regex("""^/(chat)/$""") -> pool(classOf[ChatController], 100),
 
-    // prototype controller for comet sample
-    new Regex("""^/(chat)/(listen)/$""") -> pool(classOf[ChatController], 100),
+    // handles comet handshake
+    new Regex("""^/(chat)/(handshake)/$""") -> pool(classOf[ChatController], 100),
 
-    // prototype controller for comet sample
-    new Regex("""^/(chat)/(send)/$""") -> pool(classOf[ChatController], 100)
+    // handles comet "listen" (/comet/)
+    new Regex("""^/(chat)/(comet)/$""") -> pool(classOf[ChatController], 100),
+
+    // handles comet send
+    new Regex("""^/(chat)/(send)/$""") -> pool(classOf[ChatController], 100),
+
+    // handles comet close
+    new Regex("""^/(chat)/(close)/$""") -> pool(classOf[ChatController], 100)
   )
 }

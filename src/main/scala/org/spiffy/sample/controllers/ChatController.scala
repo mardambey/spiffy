@@ -22,21 +22,33 @@ class ChatController extends LongPollingController {
    * Called when new data arrives.
    */
   def onDataReceived(s:Spiffy) {
-      ChatController.chatters.foreach(client => {
+      LongPollingController.sessions.foreach(client => {
 	log.debug("Sending to " + client._2)
-	client._2 ! Send(s.req.getParameter("data"))
-	client._2 ! End()
-      })
-
-      ChatController.chatters.clear
-      s.ctx.complete
+	client._2 match {
+	  case c:ActorRef => {
+	    c ! Send(s.req.getParameter("d"))
+	    c ! End()
+	  }
+	  case ignore => log.error("Ignored: " + ignore)
+	}
+      })      
   }
 
-  def onListenConnect(s:Spiffy) {
-    // register listener in case of errors
-    s.ctx.addListener(ChatAsyncListener) 
-    // add a client for this session        
-    ChatController.chatters += (s.req.getSession.getId -> actorOf(new ChatClient(s)).start)
+  def onCometConnect(s:Spiffy, data:ActorRef) {
+    data match {
+      case a:ActorRef => {
+	log.debug("onCometConnect: updating spiffy on " + a + " to " + s)
+	a !! s
+      }
+      case ignore => log.error("Ignored: " + ignore)
+    }
+  }
+
+  def onHandshake(s:Spiffy) : Tuple2[String, ActorRef] = {
+    val sessionKey = s.req.getSession.getId
+    val actor = actorOf(new ChatClient(s))
+    actor.start()
+    ((sessionKey, actor))
   }
 
   override def receive = super.receive orElse localReceive
@@ -52,27 +64,15 @@ class ChatController extends LongPollingController {
   }
 }
 
-import collection.JavaConversions._
-import collection.mutable.ConcurrentMap
-import java.util.concurrent.ConcurrentHashMap
-import ChatController._
-
-object ChatController {
-  /**
-   * Holds all chat clients by their session id.
-   */
-  val chatters:ConcurrentMap[String, ActorRef] = new ConcurrentHashMap[String, ActorRef]()
-}
-
-class ChatClient(s:Spiffy) extends Actor {
+class ChatClient(var s:Spiffy) extends Actor {
   def receive = {
     // send data to the client
     case Send(data:String) if (s.res != null)=> {
       log.debug("Sending msg: " + s.res + " -> " + data)
-      s.res.getWriter.println(LongPollingController.whiteSpace + data)
-      s.res.getWriter.flush     	
+      LongPollingController.send(s, "{data:\"" + data + "\"}");	
     }
-    case End() if (s.res != null && s.ctx != null) => s.ctx.complete
+    case End() if (s.res != null && s.ctx != null) => try { LongPollingController.end(s) } catch { case e:Exception => { log.error("AsyncContext already completed: " + s.ctx) } } 
+    case spiffy:Spiffy => s = spiffy
     case _ if (s.res == null) => log.debug("Client left, not sending anything")
     case ignore => log.error("Ignored: " + ignore)
   }
@@ -88,12 +88,4 @@ case class Send(data:String)
  */
 case class End()
 
-/**
- * Event listener for the async context.
- */
-object ChatAsyncListener extends AsyncListener {
-  override def onComplete(e:AsyncEvent) { }
-  override def onError(e:AsyncEvent) { log.error("AsyncError in " + e.getAsyncContext()) }
-  override def onStartAsync(e:AsyncEvent) { }
-  override def onTimeout(e:AsyncEvent) { log.error("AsyncTimeout in " + e.getAsyncContext()) }
-}
+
