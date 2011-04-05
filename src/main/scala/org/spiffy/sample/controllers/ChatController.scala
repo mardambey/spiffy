@@ -46,7 +46,7 @@ class ChatController extends LongPollingController {
 
   def onHandshake(s:Spiffy) : Tuple2[String, ActorRef] = {
     val sessionKey = s.req.getSession.getId
-    val actor = actorOf(new ChatClient(s))
+    val actor = actorOf(new ChatClient(Some(s)))
     actor.start()
     ((sessionKey, actor))
   }
@@ -64,16 +64,38 @@ class ChatController extends LongPollingController {
   }
 }
 
-class ChatClient(var s:Spiffy) extends Actor {
+/**
+ * A chat client holds a Spiffy variable when it has access
+ * to a comet connection it can use to send data to its
+ * corresponding web client.
+ */
+class ChatClient(var s:Option[Spiffy]) extends Actor {
   def receive = {
-    // send data to the client
-    case Send(data:String) if (s.res != null)=> {
-      log.debug("Sending msg: " + s.res + " -> " + data)
-      LongPollingController.send(s, "{data:\"" + data + "\"}");	
+    // send data to the client wrapped in json format 
+    // with key named "data"
+    case Send(data:String) if (s.get != None)=> {
+      log.debug("Sending msg: " + s.get.res + " -> " + data)
+      LongPollingController.send(s.get, "{data:\"" + data + "\"}");
     }
-    case End() if (s.res != null && s.ctx != null) => try { LongPollingController.end(s) } catch { case e:Exception => { log.error("AsyncContext already completed: " + s.ctx) } } 
-    case spiffy:Spiffy => s = spiffy
-    case _ if (s.res == null) => log.debug("Client left, not sending anything")
+
+    // end the connection, remove the spiffy object and wait 
+    // for a new one
+    case End() if (s.get != None) => {
+      try { 
+	val spiffy = s.get
+	s = None
+	LongPollingController.end(spiffy) 
+      } catch { 
+	case e:Exception => { 
+	  log.error("AsyncContext already completed: " + e.getMessage)
+	} 
+      } 
+    }
+
+    // a new spiffy object means we are now holding a 
+    // new connection
+    case spiffy:Spiffy => s = Some(spiffy)
+  
     case ignore => log.error("Ignored: " + ignore)
   }
 }
