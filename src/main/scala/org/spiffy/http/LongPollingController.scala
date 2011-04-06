@@ -1,5 +1,6 @@
 package org.spiffy.http
 
+import scala.collection.mutable.Queue
 import java.util.Date
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -47,12 +48,25 @@ trait LongPollingController extends Actor
       val sessionKey = Option(s.req.getParameter("s"))
       sessionKey match {
 	case Some(key) if (LongPollingController.sessions.contains(key)) => {
-	  onCometConnect(s, LongPollingController.sessions.get(key).get);
-	  // listen to events, if errors occur, clean up
-	  s.ctx.addListener(LongPollingAsyncListener)
-	  // send enough headers to keep the client connected and waiting
-	  headers(s)
-	  log.debug("Client connected to comet: " + s.ctx + " - " + s.req.getSession)	  
+
+	  // check to see if we have any queued packets for this client, if so, 
+	  // send them out and do not fire the onCometConnect
+	  // TODO: when we implement multiple packets we can fire them all 
+	  // out at once, or multiple ones, then also call onCometConnect if 
+	  // the queue size is empty
+	  if (packetQ.isDefinedAt(key) && packetQ(key).size > 0) {
+	    val data = packetQ(key).dequeue
+	    LongPollingController.send(key, Some(s), data) // packet already jsonified
+	    LongPollingController.end(s)
+	    log.debug("Dequeued and sent packet: " + data + ", queue size = " + packetQ(key).size)
+	  } else {
+	    onCometConnect(s, LongPollingController.sessions.get(key).get);
+	    // listen to events, if errors occur, clean up
+	    s.ctx.addListener(LongPollingAsyncListener)
+	    // send enough headers to keep the client connected and waiting
+	    headers(s)
+	    log.debug("Client connected to comet: " + s.ctx + " - " + s.req.getSession)	  
+	  }
 	}
 	
 	 // No key
@@ -72,7 +86,7 @@ trait LongPollingController extends Actor
       sessionKey match {
 	case Some(key) if (LongPollingController.sessions.contains(key)) => {
 	  onDataReceived(s)
-	  LongPollingController.send(s, "{data:\"success\"}")
+	  LongPollingController.send(key, Some(s), "{data:\"success\"}")
 	  LongPollingController.end(s)
 	}
 	case ignore => {
@@ -93,9 +107,10 @@ trait LongPollingController extends Actor
       log.debug("Added new handshake: " + sessionKey + " -> " + sessionData)
       // register this session
       LongPollingController.sessions += (sessionKey -> sessionData)
+      LongPollingController.packetQ += (sessionKey -> Queue[String]())
       val resp = "{session:\"" + sessionKey + "\"}"      
       // send the response and end the connection
-      send(s, resp)
+      send(sessionKey, Some(s), resp)
       end(s)      
     }
     
@@ -127,15 +142,25 @@ trait LongPollingController extends Actor
 object LongPollingController {
 
   val sessions:ConcurrentMap[String, ActorRef] = new ConcurrentHashMap[String, ActorRef]()
+  val packetQ:ConcurrentMap[String, Queue[String]] = new ConcurrentHashMap[String, Queue[String]]()
 
   final val whiteSpace = " " * 1024
 
   def end(s:Spiffy) = s.ctx.complete
 
-  def send(s:Spiffy, data:String) {
-    val resp = s.req.getParameter("jsoncallback") + "(" + data + ");"    
-    s.res.getWriter.println(resp)
-    s.res.getWriter.flush
+  def send(sessionKey:String, s:Option[Spiffy], data:String) {
+
+    if (s.isDefined) {
+      val resp = s.get.req.getParameter("jsoncallback") + "(" + data + ");"
+      log.debug("Sending msg: " + resp)
+      s.get.res.getWriter.println(resp)
+      s.get.res.getWriter.flush
+    } else {
+      // if we're trying to send a packet and we have no connection 
+      // we'll queue it so we can send it later
+      packetQ(sessionKey) += data
+      log.debug("Queueing packet: " + data + ", queue size = " + packetQ.size)
+    } 
   }
 }
 

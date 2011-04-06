@@ -1,6 +1,5 @@
 package org.spiffy.sample.controllers
 
-import scala.collection.mutable.Queue
 import scala.util.matching.Regex
 import scala.collection.mutable.ListBuffer
 import javax.servlet.http._
@@ -55,7 +54,7 @@ class ChatController extends LongPollingController {
    */
   def onHandshake(s:Spiffy) : Tuple2[String, ActorRef] = {
     val sessionKey = s.req.getSession.getId
-    val actor = actorOf(new ChatClient(s))
+    val actor = actorOf(new ChatClient(s, sessionKey))
     actor.start()
     ((sessionKey, actor))
   }
@@ -76,25 +75,16 @@ class ChatController extends LongPollingController {
  * to a comet connection it can use to send data to its
  * corresponding web client.
  */
-class ChatClient(spiffy:Spiffy) extends Actor {
+class ChatClient(spiffy:Spiffy, sessionKey:String) extends Actor {
 
   var s:Option[Spiffy] = Some(spiffy)
-
-  val packetQ = Queue[String]()
 
   def receive = {
     // send data to the client wrapped in json format 
     // with key named "data"
-    case Send(data:String) if (s.isDefined)=> {
-      log.debug("Sending msg: " + s.get.res + " -> " + data)
-      LongPollingController.send(s.get, "{data:\"" + data + "\"}");
-    }
-
-    // if we're trying to send a packet and we have no connection 
-    // we'll queue it so we can send it later
-    case Send(data:String) if (s.isEmpty) => {
-      packetQ += data
-      log.debug("Queueing packet: " + data + ", queue size = " + packetQ.size)
+    case Send(data:String) => {
+      log.debug("Sending msg: " + data)
+      LongPollingController.send(sessionKey, s, "{data:\"" + data + "\"}");
     }
 
     // end the connection, remove the spiffy object and wait 
@@ -112,18 +102,8 @@ class ChatClient(spiffy:Spiffy) extends Actor {
     }
 
     // a new spiffy object means we are now holding a 
-    // new comet connection. we should check if there 
-    // are any queued packets and send them out
-    case spiffy:Spiffy => {
-      if (packetQ.size > 0) {
-	val data = packetQ.dequeue
-	LongPollingController.send(spiffy, "{data:\"" + data + "\"}");
-	LongPollingController.end(spiffy)
-	log.debug("Dequeued and sent packet: " + data + ", queue size = " + 1)
-      } else {
-	s = Some(spiffy)	
-      }
-    }
+    // new comet connection.
+    case spiffy:Spiffy => s = Some(spiffy)
   
     case ignore => log.error("Ignored: " + ignore)
   }
