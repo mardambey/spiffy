@@ -9,6 +9,8 @@
 			//			
 			// constructor
 			function CometSession() {
+				// handshake timeout
+				this.timeout = 10000
 				// url to connect to
 				this.url = "";
 				// ready state: initial, opening, open, closing, closed
@@ -21,6 +23,8 @@
 				// reconnTime will increase with the number of failed attempts
 				// until it reaches this value
 				this.maxReconnTime = 5 * 60 * 1000;
+				// starting packet id, gets incremented
+				this.packetId = 1;
 
 				// Callbacks
 				this.onopen  = function()     {};
@@ -28,8 +32,11 @@
 				this.onclose = function(code) {};
 
 				this.write = function(data) {
+					if (this.readyState != CometSession.READYSTATE_OPEN) throw "InvalidReadystate"
 					var self = this;
-					$.getJSON(this.url + "send/?s=" + this.sessionKey + "&d=" + data + "&jsoncallback=?", function(json) {
+					var d = "[" + this.packetId + ",\"" + data.replace(/"/g,'\\"').replace(/'/g,"\\'") + "\"]";
+					this.packetId++;
+					$.getJSON(this.url + "send/?s=" + this.sessionKey + "&d=" + d + "&jsoncallback=?", function(json) {
 						// TODO: handle errors / success
 					}).error(function() {
 						alert("error sending!!");
@@ -50,11 +57,17 @@
 					if (typeof url == "undefined") url = this.url;
 					this.readyState = CometSession.READYSTATE_OPENING;
 					var self = this;
-					$.getJSON(this.url + "handshake/?d=&jsoncallback=?", function(json) {
-						self.sessionKey = json.session;
-						self.readyState = CometSession.READYSTATE_OPEN;					
-						self.onopen();
-						self.listen();
+
+					$.ajax({
+						url: this.url + "handshake/?d=&jsoncallback=?",
+						dataType: 'json',
+						timeout: this.timeout,
+						success: function(sessionKey) {
+							self.sessionKey = sessionKey;
+							self.readyState = CometSession.READYSTATE_OPEN;					
+							self.onopen();
+							self.listen();
+						}
 					});
 				};
 
@@ -67,7 +80,10 @@
 				this.listen = function() {
 					var self = this;
 					$.getJSON(this.url + "comet/?d=&s=" + self.sessionKey + "&jsoncallback=?", function(json,	status) {
-						self.onread(json);
+						
+						alert("got some data: " + json);
+
+						self.onread(json[1]);
 						self.currReconnTime = self.reconnTime;
 						if (status == "success") self.listen();
 					}).error(function() {
@@ -85,13 +101,7 @@
 			CometSession.prototype.READYSTATE_CLOSING = 3;
 			CometSession.prototype.READYSTATE_CLOSED = 4;
 
-			// data packet
-			CometSession.prototype.Packet = function() {
-				this.id = 0;
-				this.encoding = CometSession.PACKET_ENCODING_BASE64;
-				this.data = "{}";
-			};
-
+			// TODO: implement packet encoding
 			// different packet encodings
 			CometSession.prototype.PACKET_ENCODING_TEXT = 0;
 			CometSession.prototype.PACKET_ENCODING_BASE64 = 1;
@@ -104,7 +114,7 @@
 
 			function init() {
 				session.onopen = function() {};
-				session.onread = function(data) { alert("onread: " + data.data) };
+				session.onread = function(data) { alert("onread: " + data) };
 				session.onclose = function(code) { alert("closed: " + code); };
 				session.connect("/spiffy/chat/");
 			}

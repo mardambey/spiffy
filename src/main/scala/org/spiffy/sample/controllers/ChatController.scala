@@ -22,12 +22,12 @@ class ChatController extends LongPollingController {
   /**
    * Called when new data arrives.
    */
-  def onDataReceived(s:Spiffy) {
+  def onDataReceived(s:Spiffy, msg:String) {
       LongPollingController.sessions.foreach(client => {
 	log.debug("Sending to " + client._2)
 	client._2 match {
 	  case c:ActorRef => {
-	    c ! Send(s.req.getParameter("d"))
+	    c ! Send(msg)
 	    c ! End()
 	  }
 	  case ignore => log.error("Ignored: " + ignore)
@@ -84,7 +84,7 @@ class ChatClient(spiffy:Spiffy, sessionKey:String) extends Actor {
     // with key named "data"
     case Send(data:String) => {
       log.debug("Sending msg: " + data)
-      LongPollingController.send(sessionKey, s, "{data:\"" + data + "\"}");
+      LongPollingController.send(sessionKey, s, data);
     }
 
     // end the connection, remove the spiffy object and wait 

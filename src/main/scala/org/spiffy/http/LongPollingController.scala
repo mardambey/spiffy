@@ -5,13 +5,16 @@ import java.util.Date
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+import net.liftweb.json._
+import net.liftweb.json.JsonDSL._
+
 import akka.actor.{Actor,ActorRef}
 import akka.actor.Actor._
 import LongPollingController._
 
 import collection.JavaConversions._
-import collection.mutable.ConcurrentMap
-import java.util.concurrent.ConcurrentHashMap
+import collection.mutable.{ConcurrentMap => CMap}
+import java.util.concurrent.{ConcurrentHashMap => JCMap}
 import javax.servlet.{AsyncListener,AsyncEvent}
 
 /**
@@ -39,7 +42,7 @@ trait LongPollingController extends Actor
   /**
    * Handles incoming requests.
    */
-  def receive = {            
+  def receive = {
      // Handles "/base/comet". Clients request this url and block until data
      // is sent over to them at which point they will process it and connect
      // again to this url.     
@@ -56,16 +59,16 @@ trait LongPollingController extends Actor
 	  // the queue size is empty
 	  if (packetQ.isDefinedAt(key) && packetQ(key).size > 0) {
 	    val data = packetQ(key).dequeue
-	    LongPollingController.send(key, Some(s), data) // packet already jsonified
+	    LongPollingController.send(key, Some(s), data)
 	    LongPollingController.end(s)
 	    log.debug("Dequeued and sent packet: " + data + ", queue size = " + packetQ(key).size)
 	  } else {
-	    onCometConnect(s, LongPollingController.sessions.get(key).get);
+	    onCometConnect(s, LongPollingController.sessions.get(key).get)
 	    // listen to events, if errors occur, clean up
 	    s.ctx.addListener(LongPollingAsyncListener)
 	    // send enough headers to keep the client connected and waiting
 	    headers(s)
-	    log.debug("Client connected to comet: " + s.ctx + " - " + s.req.getSession)	  
+	    log.debug("Client connected to comet: " + s.ctx + " - " + s.req.getSession)
 	  }
 	}
 	
@@ -85,9 +88,27 @@ trait LongPollingController extends Actor
       val sessionKey = Option(s.req.getParameter("s"))
       sessionKey match {
 	case Some(key) if (LongPollingController.sessions.contains(key)) => {
-	  onDataReceived(s)
-	  LongPollingController.send(key, Some(s), "{data:\"success\"}")
-	  LongPollingController.end(s)
+	  // decode the packet
+	  try {
+	    val d = parse(s.req.getParameter("d"))
+	    d match {
+	      case JArray(List(JInt(id), JString(data))) => {
+		// single packet
+		onDataReceived(s, data)
+		LongPollingController.send(key, Some(s), "success")
+		LongPollingController.end(s)	       
+	      }
+	      case JArray(packets) => {
+		log.debug("Received multiple packets: " + packets)
+		// TODO: implement this		
+	      }
+	      case ignore =>
+	    }
+	  } catch {
+	    case e:Exception => {
+	      log.debug("Exception while decoding packets: " + e.getMessage())
+	    }
+	  }
 	}
 	case ignore => {
 	  log.debug("Client did not provide sessionKey or sessionKey not registered, handshake first: " + s.ctx + " - " + s.req.getSession)
@@ -105,15 +126,21 @@ trait LongPollingController extends Actor
       // that he wishes to associate with this session key
       val ((sessionKey, sessionData)) = onHandshake(s);
       log.debug("Added new handshake: " + sessionKey + " -> " + sessionData)
+      
       // register this session
       LongPollingController.sessions += (sessionKey -> sessionData)
       LongPollingController.packetQ += (sessionKey -> Queue[String]())
-      val resp = "{session:\"" + sessionKey + "\"}"      
+      LongPollingController.packetIds += (sessionKey -> 1)
+      
       // send the response and end the connection
-      send(sessionKey, Some(s), resp)
+      sendRaw(s, "\"" + sessionKey + "\"")
       end(s)      
     }
     
+    /**
+     * Close the session.
+     * TODO: implement
+     */
     case s @ R(BASE, "close") => {
     }
 
@@ -127,7 +154,7 @@ trait LongPollingController extends Actor
    * Callback the child implements to be notified of the
    * arrival of new data.
    */
-  def onDataReceived(s:Spiffy)
+  def onDataReceived(s:Spiffy, msg:String)
   
   def headers(s:Spiffy) {
     s.res.setHeader("Expires", "Mon, 26 Jul 1997 05:00:00 GMT")
@@ -141,20 +168,39 @@ trait LongPollingController extends Actor
 
 object LongPollingController {
 
-  val sessions:ConcurrentMap[String, ActorRef] = new ConcurrentHashMap[String, ActorRef]()
-  val packetQ:ConcurrentMap[String, Queue[String]] = new ConcurrentHashMap[String, Queue[String]]()
+  val sessions:CMap[String, ActorRef] = new JCMap[String, ActorRef]()
+  val packetQ:CMap[String, Queue[String]] = new JCMap[String, Queue[String]]()
+  val packetIds:CMap[String, Int] = new JCMap[String, Int]()
 
   final val whiteSpace = " " * 1024
 
+  /**
+   * Ends the request by completing the async context
+   */
   def end(s:Spiffy) = s.ctx.complete
 
-  def send(sessionKey:String, s:Option[Spiffy], data:String) {
+  /**
+   * Sends the given data as is wrapping it in a javascript
+   * function who's name is provided in the initial request
+   * under the parameter name "jsoncallback".
+   */
+  def sendRaw(s:Spiffy, data:String) {
+    val resp = s.req.getParameter("jsoncallback") + "(" + data + ");"
+    log.debug("Sending msg: " + resp)
+    s.res.getWriter.println(resp)
+    s.res.getWriter.flush
+  }
 
+  /**
+   * Sends out data to the client, encodes it into a packet which
+   * is a JSON array [id, data]. Increments the packet id counter.
+   */
+  def send(sessionKey:String, s:Option[Spiffy], data:String) {
     if (s.isDefined) {
-      val resp = s.get.req.getParameter("jsoncallback") + "(" + data + ");"
-      log.debug("Sending msg: " + resp)
-      s.get.res.getWriter.println(resp)
-      s.get.res.getWriter.flush
+      val id = packetIds(sessionKey)
+      packetIds(sessionKey) = id + 1
+      val resp = compact(render(JArray(List(id, data))))
+      sendRaw(s.get, resp)
     } else {
       // if we're trying to send a packet and we have no connection 
       // we'll queue it so we can send it later
