@@ -83,7 +83,15 @@
 						
 						alert("got some data: " + json);
 
-						self.onread(json[1]);
+						// check for single packet
+						if (json.length ==2 && typeof json[0] == "number") {
+							self.onread(json[1]);
+						} else {
+							for (var packet in json) {
+								self.onread(json[packet][1]);
+							}
+						}
+
 						self.currReconnTime = self.reconnTime;
 						if (status == "success") self.listen();
 					}).error(function() {

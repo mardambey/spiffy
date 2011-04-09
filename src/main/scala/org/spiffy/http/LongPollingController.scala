@@ -50,20 +50,17 @@ trait LongPollingController extends Actor
       // verify session is valid
       val sessionKey = Option(s.req.getParameter("s"))
       sessionKey match {
-	case Some(key) if (LongPollingController.sessions.contains(key)) => {
-
+	case Some(key) if (sessions.contains(key)) => {
 	  // check to see if we have any queued packets for this client, if so, 
 	  // send them out and do not fire the onCometConnect
-	  // TODO: when we implement multiple packets we can fire them all 
-	  // out at once, or multiple ones, then also call onCometConnect if 
-	  // the queue size is empty
-	  if (packetQ.isDefinedAt(key) && packetQ(key).size > 0) {
-	    val data = packetQ(key).dequeue
-	    LongPollingController.send(key, Some(s), data)
-	    LongPollingController.end(s)
-	    log.debug("Dequeued and sent packet: " + data + ", queue size = " + packetQ(key).size)
+	  if (packetQ.isDefinedAt(key) && packetQ(key).size > 0) {	    
+	    sendSeq(key, Some(s), packetQ(key))
+	    packetQ(key).clear // TODO: this is not safe, we might lose packets
+	    end(s)
+	    log.debug("Dequeued and sent packets.")
 	  } else {
-	    onCometConnect(s, LongPollingController.sessions.get(key).get)
+	    // issue event to implementing class
+	    onCometConnect(s, sessions.get(key).get)
 	    // listen to events, if errors occur, clean up
 	    s.ctx.addListener(LongPollingAsyncListener)
 	    // send enough headers to keep the client connected and waiting
@@ -87,7 +84,7 @@ trait LongPollingController extends Actor
       // verify session is valid
       val sessionKey = Option(s.req.getParameter("s"))
       sessionKey match {
-	case Some(key) if (LongPollingController.sessions.contains(key)) => {
+	case Some(key) if (sessions.contains(key)) => {
 	  // decode the packet
 	  try {
 	    val d = parse(s.req.getParameter("d"))
@@ -95,8 +92,8 @@ trait LongPollingController extends Actor
 	      case JArray(List(JInt(id), JString(data))) => {
 		// single packet
 		onDataReceived(s, data)
-		LongPollingController.send(key, Some(s), "success")
-		LongPollingController.end(s)	       
+		send(key, Some(s), "success")
+		end(s)	       
 	      }
 	      case JArray(packets) => {
 		log.debug("Received multiple packets: " + packets)
@@ -128,9 +125,9 @@ trait LongPollingController extends Actor
       log.debug("Added new handshake: " + sessionKey + " -> " + sessionData)
       
       // register this session
-      LongPollingController.sessions += (sessionKey -> sessionData)
-      LongPollingController.packetQ += (sessionKey -> Queue[String]())
-      LongPollingController.packetIds += (sessionKey -> 1)
+      sessions += (sessionKey -> sessionData)
+      packetQ += (sessionKey -> Queue[String]())
+      packetIds += (sessionKey -> 1)
       
       // send the response and end the connection
       sendRaw(s, "\"" + sessionKey + "\"")
@@ -146,8 +143,18 @@ trait LongPollingController extends Actor
 
   }
 
+  /**
+   * Callback implementors use to be notified when a
+   * new comet connection has been established.
+   */
   def onCometConnect(s:Spiffy, data:ActorRef)
 
+  /**
+   * Callback implementors use to hand back a session
+   * key and actor to couple it with.
+   * TODO: the ActorRef restriction should go away and
+   * it needs to be replaced with an Any.
+   */
   def onHandshake(s:Spiffy):Tuple2[String, ActorRef]
 
   /**
@@ -156,6 +163,9 @@ trait LongPollingController extends Actor
    */
   def onDataReceived(s:Spiffy, msg:String)
   
+  /**
+   * Send headers to keep client hanging on and waiting for data.
+   */
   def headers(s:Spiffy) {
     s.res.setHeader("Expires", "Mon, 26 Jul 1997 05:00:00 GMT")
     s.res.setHeader("'Last-Modified", now)
@@ -168,11 +178,23 @@ trait LongPollingController extends Actor
 
 object LongPollingController {
 
+  /**
+   * Maps sessions to actors (data associated with session)
+   */
   val sessions:CMap[String, ActorRef] = new JCMap[String, ActorRef]()
-  val packetQ:CMap[String, Queue[String]] = new JCMap[String, Queue[String]]()
-  val packetIds:CMap[String, Int] = new JCMap[String, Int]()
 
-  final val whiteSpace = " " * 1024
+  /**
+   * Maps sessions to packet queues, used to hold packets that can not
+   * be instantly delivered and are waiting for a comet conneciton.
+   * TODO: this queue and the entire session need to time out if no
+   * activity is received in a certain amount of time.
+   */
+  val packetQ:CMap[String, Queue[String]] = new JCMap[String, Queue[String]]()
+
+  /**
+   * Maps sessions to packet id counters.
+   */
+  val packetIds:CMap[String, Int] = new JCMap[String, Int]()
 
   /**
    * Ends the request by completing the async context
@@ -207,6 +229,21 @@ object LongPollingController {
       packetQ(sessionKey) += data
       log.debug("Queueing packet: " + data + ", queue size = " + packetQ.size)
     } 
+  }
+
+  /**
+   * Sends out data from the given sequence as a batch of packets in
+   * JSON format.
+   */
+  def sendSeq(sessionKey:String, s:Option[Spiffy], packets:Seq[String]) {
+    if (s.isDefined) {
+      val id = packetIds(sessionKey)
+      val data = JArray((id until id + packets.size zip packets).map(p => JArray(List(p._1, p._2))).toList)
+      val json = compact(render(data))
+      log.debug("Sending multiple packets: " + json)
+      packetIds(sessionKey) += packets.size
+      sendRaw(s.get, json)
+    }
   }
 }
 
