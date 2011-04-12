@@ -20,6 +20,11 @@ import javax.servlet.{AsyncListener,AsyncEvent}
 /**
  * Controller that implements basic listening and sending functionality
  * over long polling.
+ *
+ * TODO:
+ * Send null packet on session end.
+ * Implement persistent variables.
+ * Implement per session variables.
  * 
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
@@ -48,7 +53,7 @@ trait LongPollingController extends Actor
      // again to this url.     
     case s @ R(BASE, "comet") => {
       // verify session is valid
-      val sessionKey = Option(s.req.getParameter("s"))
+      val sessionKey = Option(s.req.getParameter(SESSION_KEY))
       sessionKey match {
 	case Some(key) if (sessions.contains(key)) => {
 	  // check to see if we have any queued packets for this client, if so, 
@@ -80,14 +85,14 @@ trait LongPollingController extends Actor
     // Handles "/base/send" by making sure there is a valid session 
     // then calling the implementor's onDataReceived callback
     case s @ R(BASE, "send") => {
-      log.debug("Data being sent: " + s.req.getParameter("d"))
+      log.debug("Data being sent: " + s.req.getParameter(DATA))
       // verify session is valid
-      val sessionKey = Option(s.req.getParameter("s"))
+      val sessionKey = Option(s.req.getParameter(SESSION_KEY))
       sessionKey match {
 	case Some(key) if (sessions.contains(key)) => {
 	  // decode the packet
 	  try {
-	    val d = parse(s.req.getParameter("d"))
+	    val d = parse(s.req.getParameter(DATA))
 	    d match {
 	      case JArray(List(JInt(id), JString(data))) => {
 		// single packet
@@ -195,6 +200,167 @@ object LongPollingController {
    * Maps sessions to packet id counters.
    */
   val packetIds:CMap[String, Int] = new JCMap[String, Int]()
+
+  /**
+   * The DURATION variable signifies how long the server
+   * should leave a Comet request open before completing
+   * the response. A value of "0" will cause a response to
+   * always be sent immediately after a request is received,
+   * thus setting the connection mode to polling. Values of
+   * DURATION > 0 are used in conjunction with streaming
+   * and long polling, and will typically range from 10-45
+   * seconds. A DURATION value of 0 will override IS_STREAMING
+   * with the value 0, forcing the connection into polling mode.
+   */
+  val DURATION = "du"
+
+  /**
+   * The IS_STREAMING variable signifies to the server
+   * if the Comet HTTP response should be completed
+   * after a single batch of packets. A value of 1 for
+   * IS_STREAMING means that the server will never
+   * complete the HTTP response due to a batch of
+   * packets, only when the DURATION has expired.
+   * This is the streaming mode. Any other value for
+   * IS_STREAMING will cause the server to always
+   * complete the HTTP response after sending a
+   * batch of packets. In this case, the connection
+   * will be in long polling mode.
+   */
+  val IS_STREAMING = "is"
+
+  /**
+   * The INTERVAL variable signifies the idle interval (time
+   * since the connection opened or the last packet batch
+   * was sent) after which an empty batch of packets will be
+   * sent. The INTERVAL variable will be ignored unless the
+   * value of IS_STREAMING is 1. The purpose of the INTERVAL
+   * variable is to keep intermediaries from closing a streaming
+   * connection due to inactivity.
+   */
+  val INTERVAL = "i"
+
+  /**
+   * The PREBUFFER_SIZE variable is parsed as an integer and
+   * determines the number of empty bytes (U+0020) to send at
+   * the start of the body of each HTTP Comet response. It is
+   * ignored unless the value of IS_STREAMING is 1. The purpose
+   * of the PREBUFFER_SIZE is to meet minimum buffering
+   * conditions that cause some intermediaries to delay delivery
+   * of initial events in a streaming connection. Obvious example
+   * include the IE and Webkit network stacks.
+   */
+  val PREBUFFER_SIZE = "ps"
+
+  /**
+   * The PREAMBLE variable indicates a default string that will be
+   * sent at the start of each Comet HTTP response body. These
+   * bytes will be sent after any empty bytes resulting from a
+   * PREBUFFER_SIZE > 0. The purpose of the PREAMBLE is to
+   * enable various Comet transports, including iframe streaming
+   * and ActiveX('htmlfile') streaming.
+   */
+  val PREAMBLE = "p"
+
+  /**
+   * The BATCH_PREFIX variable indicates a default string that will
+   * be sent immediately before each batch of packets. The purpose of
+   * the BATCH_PREFIX variable is to enable various Comet transports,
+   * including jsonp polling/long polling, various forms of script-tag
+   * streaming, and sse.
+   */
+  val BATCH_PREFIX = "bp"
+
+  /**
+   * The BATCH_SUFFIX variable indicates a default string that will
+   * be sent immediately after each batch of packets. The purpose
+   * of the BATCH_SUFFIX variable is to enable various Comet
+   * transports, including sse and various forms of script-tag streaming.
+   */
+  val BATCH_SUFFIX = "bs"
+  
+  /**
+   * The GZIP_OK variable indicates that it is acceptable to use
+   * gzip-encoded responses to any request. No server is required
+   * to support gzipping. This variable is used instead of the
+   * Accept-Encoding header because clients may not always have
+   * control of the header. Furthermore, even if a browser purports
+   * to support gzip, some streaming transports may be buffered i
+   * ncorrectly when gzip is used. If there there is an existing HTTP
+   * Comet request that hasn't been completed when another request
+   * changes the value of GZIP_OK, that request must immediately
+   * complete its response. (See 3.3.4.4 Completing the Response.)
+   */
+  val GZIP_OK = "g"
+
+  /**
+   * If the SSE variable is 1, then SSE_ID is: id: %(LAST_MSG_ID)\r\n
+   * where LAST_MSG_ID is the packet sequence id of the last
+   * message in the batch. Otherwise SSE_ID is an empty string.
+   * The purpose of the SSE variable is to enable the server-sent
+   * events transports as defined by the html5 specification.
+   * Specifically, this variable causes the browser's event-source
+   * tag to send a correct Last-Event-Id when reconnecting.
+   */
+  val SSE = "se"
+
+  /**
+   * The CONTENT_TYPE variable is a string that represents the
+   * value of the Content-Type header that will be used in all
+   * HTTP response (both for HTTP Comet response and ordinary
+   * responses.) It is used to enable multiple variants of HTML5
+   * and Opera server-sent events, IE XML streaming, and
+   * reduce the required value of PREBUFFER_SIZE in Webkit.
+   * The default value of CONTENT-TYPE is text/html.
+   */
+  val CONTENT_TYPE = "ct"
+
+  /**
+   * The REQUEST_PREFIX indicates the default string that will
+   * be sent in the body of a response immediately before the
+   * result of that response. It is used to specify a callback for
+   * jsonp-style script-tag requests. Once these variables are
+   * set, they persist for all responses to /handshake and /send
+   * requests, until explicitly altered.
+   */
+  val REQUEST_PREFIX = "rp"
+
+  /**
+   * The REQUEST_SUFFIX indicates the default string that is sent
+   * in the body of a response immediately following the result
+   * of that response.
+   */
+  val REQUEST_SUFFIX = "rs"
+
+  /**
+   The SESSION_KEY is first provided in the handshake by the server,
+   * and must be sent by the client in all subsequent requests. Any
+   * non-handshake request missing a SESSION_KEY is invalid.
+   */
+  val SESSION_KEY = "s"
+
+  /**
+   * The ACK_ID variable represents the highest packet sequence id that the
+   * client previously received. The value of an ACK_ID must be an integer.
+   * Any request following the handshake may have an ACK_ID. The ACK_ID
+   * is not persisted.
+   */
+  val ACK_ID = "a"
+
+  /**
+   * The DATA variable represents a client -> server payload of data encoded as a
+   * batch of packets. It is used with requests to /send and /handshake (in order
+   * to specify the value of the handshake object), and does not persist.
+   * */
+  val DATA = "d"
+
+  /**
+   * The NO_CACHE variable is ignored by the server. It can be used by the client to
+   * keep a browser or proxy cache from caching the response to a comet, handshake,
+   * or send request. If necessary, the client should base the value of NO_CACHE on
+   * the javascript Date object. NO_CACHE is not persisted.
+   */
+  val NO_CACHE = "n"
 
   /**
    * Ends the request by completing the async context
