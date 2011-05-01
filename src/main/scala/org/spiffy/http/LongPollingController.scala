@@ -5,17 +5,16 @@ import java.util.Date
 import java.text.SimpleDateFormat
 import java.util.Locale
 
-import net.liftweb.json._
 import net.liftweb.json.JsonDSL._
-
-import akka.actor.{Actor,ActorRef}
+import net.liftweb.json._
+import akka.actor.{Actor, ActorRef}
 import akka.actor.Actor._
 import LongPollingController._
 
 import collection.JavaConversions._
 import collection.mutable.{ConcurrentMap => CMap}
 import java.util.concurrent.{ConcurrentHashMap => JCMap}
-import javax.servlet.{AsyncListener,AsyncEvent}
+import javax.servlet.{AsyncListener, AsyncEvent}
 
 /**
  * Controller that implements basic listening and sending functionality
@@ -25,97 +24,98 @@ import javax.servlet.{AsyncListener,AsyncEvent}
  * Send null packet on session end.
  * Implement persistent variables.
  * Implement per session variables.
- * 
+ *
  * @author Hisham Mardam-Bey <hisham.mardambey@gmail.com>
  */
-trait LongPollingController extends Actor
-{
+trait LongPollingController extends Actor {
   /**
    * date format used in http headers
    */
   val httpDateFormat = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.US);
 
-  /**   
+  /**
    * current timestamp
    */
-  val now = { httpDateFormat.format(new Date) }
+  val now = {
+    httpDateFormat.format(new Date)
+  }
   /**
    * base name the child controller will be using: "/chat/"
    */
-  val BASE:String
+  val BASE: String
 
   /**
    * Handles incoming requests.
    */
   def receive = {
-     // Handles "/base/comet". Clients request this url and block until data
-     // is sent over to them at which point they will process it and connect
-     // again to this url.     
-    case s @ R(BASE, "comet") => {
+    // Handles "/base/comet". Clients request this url and block until data
+    // is sent over to them at which point they will process it and connect
+    // again to this url.
+    case s@R(BASE, "comet") => {
       // verify session is valid
       val sessionKey = Option(s.req.getParameter(SESSION_KEY))
       sessionKey match {
-	case Some(key) if (sessions.contains(key)) => {
-	  // check to see if we have any queued packets for this client, if so, 
-	  // send them out and do not fire the onCometConnect
-	  if (packetQ.isDefinedAt(key) && packetQ(key).size > 0) {	    
-	    sendSeq(key, Some(s), packetQ(key))
-	    packetQ(key).clear // TODO: this is not safe, we might lose packets
-	    end(s)
-	    log.debug("Dequeued and sent packets.")
-	  } else {
-	    // issue event to implementing class
-	    onCometConnect(s, sessions.get(key).get)
-	    // listen to events, if errors occur, clean up
-	    s.ctx.addListener(LongPollingAsyncListener)
-	    // send enough headers to keep the client connected and waiting
-	    headers(s)
-	    log.debug("Client connected to comet: " + s.ctx + " - " + s.req.getSession)
-	  }
-	}
-	
-	 // No key
-	case ignore => {
-	  log.debug("Client did not provide sessionKey or sessionKey not registered, handshake first: " + s)
-	  s.ctx.complete
-	}	
-      }      
+        case Some(key) if (sessions.contains(key)) => {
+          // check to see if we have any queued packets for this client, if so,
+          // send them out and do not fire the onCometConnect
+          if (packetQ.isDefinedAt(key) && packetQ(key).size > 0) {
+            sendSeq(key, Some(s), packetQ(key))
+            packetQ(key).clear() // TODO: this is not safe, we might lose packets
+            end(s)
+            log.debug("Dequeued and sent packets.")
+          } else {
+            // issue event to implementing class
+            onCometConnect(s, sessions.get(key).get)
+            // listen to events, if errors occur, clean up
+            s.ctx.addListener(LongPollingAsyncListener)
+            // send enough headers to keep the client connected and waiting
+            headers(s)
+            log.debug("Client connected to comet: " + s.ctx + " - " + s.req.getSession)
+          }
+        }
+
+        // No key
+        case ignore => {
+          log.debug("Client did not provide sessionKey or sessionKey not registered, handshake first: " + s)
+          s.ctx.complete()
+        }
+      }
     }
-    
+
     // Handles "/base/send" by making sure there is a valid session 
     // then calling the implementor's onDataReceived callback
-    case s @ R(BASE, "send") => {
+    case s@R(BASE, "send") => {
       log.debug("Data being sent: " + s.req.getParameter(DATA))
       // verify session is valid
       val sessionKey = Option(s.req.getParameter(SESSION_KEY))
       sessionKey match {
-	case Some(key) if (sessions.contains(key)) => {
-	  // decode the packet
-	  try {
-	    val d = parse(s.req.getParameter(DATA))
-	    d match {
-	      case JArray(List(JInt(id), JString(data))) => {
-		// single packet
-		onDataReceived(s, data)
-		send(key, Some(s), "success")
-		end(s)	       
-	      }
-	      case JArray(packets) => {
-		log.debug("Received multiple packets: " + packets)
-		// TODO: implement this		
-	      }
-	      case ignore =>
-	    }
-	  } catch {
-	    case e:Exception => {
-	      log.debug("Exception while decoding packets: " + e.getMessage())
-	    }
-	  }
-	}
-	case ignore => {
-	  log.debug("Client did not provide sessionKey or sessionKey not registered, handshake first: " + s.ctx + " - " + s.req.getSession)
-	  s.ctx.complete
-	}
+        case Some(key) if (sessions.contains(key)) => {
+          // decode the packet
+          try {
+            val d = parse(s.req.getParameter(DATA))
+            d match {
+              case JArray(List(JInt(id), JString(data))) => {
+                // single packet
+                onDataReceived(s, data)
+                send(key, Some(s), "success")
+                end(s)
+              }
+              case JArray(packets) => {
+                log.debug("Received multiple packets: " + packets)
+                // TODO: implement this
+              }
+              case ignore =>
+            }
+          } catch {
+            case e: Exception => {
+              log.debug("Exception while decoding packets: " + e.getMessage)
+            }
+          }
+        }
+        case ignore => {
+          log.debug("Client did not provide sessionKey or sessionKey not registered, handshake first: " + s.ctx + " - " + s.req.getSession)
+          s.ctx.complete()
+        }
       }
     }
 
@@ -123,55 +123,55 @@ trait LongPollingController extends Actor
      * The hand shake process gives back the client a session key that has
      * to be used to make future interactions.
      */
-    case s @ R(BASE, "handshake") => {
+    case s@R(BASE, "handshake") => {
       // ask for a session key from our implementor, also store the data 
       // that he wishes to associate with this session key
       val ((sessionKey, sessionData)) = onHandshake(s);
       log.debug("Added new handshake: " + sessionKey + " -> " + sessionData)
-      
+
       // register this session
-      sessions += (sessionKey -> sessionData)
+      sessions.put(sessionKey, sessionData)
       packetQ += (sessionKey -> Queue[String]())
       packetIds += (sessionKey -> 1)
-      
+
       // send the response and end the connection
       sendRaw(s, "\"" + sessionKey + "\"")
-      end(s)      
+      end(s)
     }
-    
+
     /**
      * Close the session.
      * TODO: implement
      */
-    case s @ R(BASE, "close") => {
+    case s@R(BASE, "close") => {
     }
 
   }
 
   /**
-   * Callback implementors use to be notified when a
+   * Callback implementers use to be notified when a
    * new comet connection has been established.
    */
-  def onCometConnect(s:Spiffy, data:ActorRef)
+  def onCometConnect(s: Spiffy, data: ActorRef)
 
   /**
-   * Callback implementors use to hand back a session
+   * Callback implementers use to hand back a session
    * key and actor to couple it with.
    * TODO: the ActorRef restriction should go away and
    * it needs to be replaced with an Any.
    */
-  def onHandshake(s:Spiffy):Tuple2[String, ActorRef]
+  def onHandshake(s: Spiffy): Tuple2[String, ActorRef]
 
   /**
    * Callback the child implements to be notified of the
    * arrival of new data.
    */
-  def onDataReceived(s:Spiffy, msg:String)
-  
+  def onDataReceived(s: Spiffy, msg: String)
+
   /**
    * Send headers to keep client hanging on and waiting for data.
    */
-  def headers(s:Spiffy) {
+  def headers(s: Spiffy) {
     s.res.setHeader("Expires", "Mon, 26 Jul 1997 05:00:00 GMT")
     s.res.setHeader("'Last-Modified", now)
     s.res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate")
@@ -186,20 +186,20 @@ object LongPollingController {
   /**
    * Maps sessions to actors (data associated with session)
    */
-  val sessions:CMap[String, ActorRef] = new JCMap[String, ActorRef]()
+  val sessions:ClientMap = new LocalClientMap()
 
   /**
    * Maps sessions to packet queues, used to hold packets that can not
-   * be instantly delivered and are waiting for a comet conneciton.
+   * be instantly delivered and are waiting for a comet connection.
    * TODO: this queue and the entire session need to time out if no
    * activity is received in a certain amount of time.
    */
-  val packetQ:CMap[String, Queue[String]] = new JCMap[String, Queue[String]]()
+  val packetQ: CMap[String, Queue[String]] = new JCMap[String, Queue[String]]()
 
   /**
    * Maps sessions to packet id counters.
    */
-  val packetIds:CMap[String, Int] = new JCMap[String, Int]()
+  val packetIds: CMap[String, Int] = new JCMap[String, Int]()
 
   /**
    * The DURATION variable signifies how long the server
@@ -278,7 +278,7 @@ object LongPollingController {
    * transports, including sse and various forms of script-tag streaming.
    */
   val BATCH_SUFFIX = "bs"
-  
+
   /**
    * The GZIP_OK variable indicates that it is acceptable to use
    * gzip-encoded responses to any request. No server is required
@@ -333,7 +333,7 @@ object LongPollingController {
   val REQUEST_SUFFIX = "rs"
 
   /**
-   The SESSION_KEY is first provided in the handshake by the server,
+  The SESSION_KEY is first provided in the handshake by the server,
    * and must be sent by the client in all subsequent requests. Any
    * non-handshake request missing a SESSION_KEY is invalid.
    */
@@ -351,7 +351,7 @@ object LongPollingController {
    * The DATA variable represents a client -> server payload of data encoded as a
    * batch of packets. It is used with requests to /send and /handshake (in order
    * to specify the value of the handshake object), and does not persist.
-   * */
+   **/
   val DATA = "d"
 
   /**
@@ -365,25 +365,25 @@ object LongPollingController {
   /**
    * Ends the request by completing the async context
    */
-  def end(s:Spiffy) = s.ctx.complete
+  def end(s: Spiffy) { s.ctx.complete() }
 
   /**
    * Sends the given data as is wrapping it in a javascript
    * function who's name is provided in the initial request
    * under the parameter name "jsoncallback".
    */
-  def sendRaw(s:Spiffy, data:String) {
+  def sendRaw(s: Spiffy, data: String) {
     val resp = s.req.getParameter("jsoncallback") + "(" + data + ");"
     log.debug("Sending msg: " + resp)
     s.res.getWriter.println(resp)
-    s.res.getWriter.flush
+    s.res.getWriter.flush()
   }
 
   /**
    * Sends out data to the client, encodes it into a packet which
    * is a JSON array [id, data]. Increments the packet id counter.
    */
-  def send(sessionKey:String, s:Option[Spiffy], data:String) {
+  def send(sessionKey: String, s: Option[Spiffy], data: String) {
     if (s.isDefined) {
       val id = packetIds(sessionKey)
       packetIds(sessionKey) = id + 1
@@ -394,14 +394,14 @@ object LongPollingController {
       // we'll queue it so we can send it later
       packetQ(sessionKey) += data
       log.debug("Queueing packet: " + data + ", queue size = " + packetQ.size)
-    } 
+    }
   }
 
   /**
    * Sends out data from the given sequence as a batch of packets in
    * JSON format.
    */
-  def sendSeq(sessionKey:String, s:Option[Spiffy], packets:Seq[String]) {
+  def sendSeq(sessionKey: String, s: Option[Spiffy], packets: Seq[String]) {
     if (s.isDefined) {
       val id = packetIds(sessionKey)
       val data = JArray((id until id + packets.size zip packets).map(p => JArray(List(p._1, p._2))).toList)
@@ -417,8 +417,15 @@ object LongPollingController {
  * Event listener for the async context.
  */
 object LongPollingAsyncListener extends AsyncListener {
-  override def onComplete(e:AsyncEvent) { }
-  override def onError(e:AsyncEvent) { log.error("AsyncError in " + e.getAsyncContext()) }
-  override def onStartAsync(e:AsyncEvent) { }
-  override def onTimeout(e:AsyncEvent) { log.error("AsyncTimeout in " + e.getAsyncContext()) }
+  override def onComplete(e: AsyncEvent) {}
+
+  override def onError(e: AsyncEvent) {
+    log.error("AsyncError in " + e.getAsyncContext)
+  }
+
+  override def onStartAsync(e: AsyncEvent) {}
+
+  override def onTimeout(e: AsyncEvent) {
+    log.error("AsyncTimeout in " + e.getAsyncContext)
+  }
 }
